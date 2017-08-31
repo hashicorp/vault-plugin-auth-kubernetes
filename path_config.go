@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -24,6 +25,7 @@ func pathConfig(b *KubeAuthBackend) *framework.Path {
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.UpdateOperation: b.pathConfigWrite(),
+			logical.CreateOperation: b.pathConfigWrite(),
 		},
 
 		HelpSynopsis:    confHelpSyn,
@@ -35,7 +37,7 @@ func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 		pemBytes := data.Get("certificate").(string)
 		if pemBytes == "" {
-			return logical.ErrorResponse("no certificate provided"), logical.ErrInvalidRequest
+			return logical.ErrorResponse("no certificate provided"), nil
 		}
 
 		config := &kubeConfig{}
@@ -43,7 +45,7 @@ func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 		var err error
 		config.Certificate, err = ParsePublicKeyPEM([]byte(pemBytes))
 		if err != nil {
-			return logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
+			return logical.ErrorResponse(err.Error()), nil
 		}
 
 		config.CertBytes, err = x509.MarshalPKIXPublicKey(config.Certificate)
@@ -66,7 +68,7 @@ func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 // kubeConfig contains the public key certificate used to verify the signature
 // on the service account JWTs
 type kubeConfig struct {
-	Certificate interface{} `json:-`
+	Certificate interface{} `json:"-"`
 	CertBytes   []byte      `json:"cert_bytes"`
 }
 
@@ -81,24 +83,29 @@ iam AUTH:
 
 func ParsePublicKeyPEM(data []byte) (interface{}, error) {
 	var block *pem.Block
-	block, data = pem.Decode(data)
+	for {
+		block, data = pem.Decode(data)
+		if block == nil {
+			return nil, errors.New("data does not contain any valid RSA or ECDSA public keys")
+		}
 
-	if block == nil {
-		return nil, errors.New("data does not contain any valid RSA or ECDSA public keys")
+		if cert, err := ParsePublicKeyDER(block.Bytes); err == nil {
+			return cert, nil
+		}
 	}
-
-	return ParsePublicKeyDER(data)
 }
 
 func ParsePublicKeyDER(data []byte) (interface{}, error) {
 	if publicKey, err := parseRSAPublicKey(data); err == nil {
 		return publicKey, nil
+	} else {
+		fmt.Println(err)
 	}
-
 	if publicKey, err := parseECPublicKey(data); err == nil {
 		return publicKey, nil
+	} else {
+		fmt.Println(err)
 	}
-
 	return nil, errors.New("data does not contain any valid RSA or ECDSA public keys")
 }
 

@@ -1,6 +1,8 @@
 package kubeauth
 
 import (
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,6 +23,8 @@ var (
 	ServiceAccountUIDClaim  string = "kubernetes.io/serviceaccount/service-account.uid"
 	SecretNameClaim         string = "kubernetes.io/serviceaccount/secret.name"
 	NamespaceClaim          string = "kubernetes.io/serviceaccount/namespace"
+
+	errMismatchedSigningMethod = errors.New("invalid signing method")
 )
 
 func pathLogin(b *KubeAuthBackend) *framework.Path {
@@ -69,7 +73,10 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 		}
 
 		config, err := b.config(req.Storage)
-		if err != nil || config == nil {
+		if err != nil {
+			return nil, err
+		}
+		if config == nil {
 			return nil, errors.New("could not load backend configuration")
 		}
 
@@ -86,9 +93,11 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 				},
 				Policies: role.Policies,
 				Metadata: map[string]string{
-					"service_account_id":   serviceAccount.UID,
-					"service_account_name": serviceAccount.Name,
-					"role":                 roleName,
+					"service_account_uid":       serviceAccount.UID,
+					"service_account_name":      serviceAccount.Name,
+					"service_account_namespace": serviceAccount.Namespace,
+					"service_account_secret":    serviceAccount.SecretName,
+					"role": roleName,
 				},
 				DisplayName: serviceAccount.Name,
 				LeaseOptions: logical.LeaseOptions{
@@ -103,13 +112,40 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 }
 
 func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+	// Parse Headers
+	{
+		parsedJWS, err := jws.Parse(jwtBytes)
+		if err != nil {
+			return nil, err
+		}
+		headers := parsedJWS.Protected()
+
+		var algStr string
+		if headers.Has("alg") {
+			algStr = headers.Get("alg").(string)
+		} else {
+			return nil, errors.New("provided JWT must have 'alg' header value")
+		}
+
+		switch jws.GetSigningMethod(algStr).(type) {
+		case *crypto.SigningMethodECDSA:
+			if _, ok := config.Certificate.(*ecdsa.PublicKey); !ok {
+				return nil, errMismatchedSigningMethod
+			}
+		case *crypto.SigningMethodRSA:
+			if _, ok := config.Certificate.(*rsa.PublicKey); !ok {
+				return nil, errMismatchedSigningMethod
+			}
+		}
+	}
+
 	// Parse claims
 	parsedJWT, err := jws.ParseJWT(jwtBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	var serviceAccount *serviceAccount
+	var serviceAccount *serviceAccount = &serviceAccount{}
 	validator := &jwt.Validator{
 		Expected: jwt.Claims{
 			"iss": expectedJWTIssuer,
@@ -132,15 +168,15 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorage
 		},
 	}
 
-	if err := parsedJWT.Validate(config.Certificate, crypto.SigningMethodRS256, validator); err != nil {
-		return nil, fmt.Errorf("invalid JWT: %v", err)
+	if err := parsedJWT.Validate(config.Certificate.(*rsa.PublicKey), crypto.SigningMethodRS256, validator); err != nil {
+		return nil, err
 	}
 
 	return serviceAccount, nil
 }
 
 type serviceAccount struct {
-	Name       string `mapstructre:"kubernetes.io/serviceaccount/service-account.name"`
+	Name       string `mapstructure:"kubernetes.io/serviceaccount/service-account.name"`
 	UID        string `mapstructure:"kubernetes.io/serviceaccount/service-account.uid"`
 	SecretName string `mapstructure:"kubernetes.io/serviceaccount/secret.name"`
 	Namespace  string `mapstructure:"kubernetes.io/serviceaccount/namespace"`
