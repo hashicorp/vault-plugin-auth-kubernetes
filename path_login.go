@@ -112,7 +112,9 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 }
 
 func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
-	// Parse Headers
+	// Parse Headers and verify the signing method matches the public key type
+	// configured. This is done in its own scope since we don't need any of
+	// these variables later.
 	{
 		parsedJWS, err := jws.Parse(jwtBytes)
 		if err != nil {
