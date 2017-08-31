@@ -5,12 +5,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/structs"
 	"github.com/hashicorp/vault/helper/policyutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
 
-func rolePaths(b *KubeAuthBackend) []*framework.Path {
+func pathsRole(b *KubeAuthBackend) []*framework.Path {
 	return []*framework.Path{
 		&framework.Path{
 			Pattern: "role/?",
@@ -78,7 +79,7 @@ TTL will be set to the value of this parameter.`,
 
 // pathRoleExistenceCheck returns whether the role with the given name exists or not.
 func (b *KubeAuthBackend) pathRoleExistenceCheck(req *logical.Request, data *framework.FieldData) (bool, error) {
-	role, err := b.roleEntry(req.Storage, data.Get("role_name").(string))
+	role, err := b.role(req.Storage, data.Get("role_name").(string))
 	if err != nil {
 		return false, err
 	}
@@ -104,14 +105,14 @@ func (b *KubeAuthBackend) pathRoleRead(req *logical.Request, data *framework.Fie
 		return logical.ErrorResponse("missing role_name"), nil
 	}
 
-	if role, err := b.roleEntry(req.Storage, strings.ToLower(roleName)); err != nil {
+	if role, err := b.role(req.Storage, strings.ToLower(roleName)); err != nil {
 		return nil, err
 	} else if role == nil {
 		return nil, nil
 	} else {
 		// Convert the 'time.Duration' values to second.
-		role.TokenTTL /= time.Second
-		role.TokenMaxTTL /= time.Second
+		role.TTL /= time.Second
+		role.MaxTTL /= time.Second
 		role.Period /= time.Second
 
 		// Create a map of data to be returned
@@ -136,7 +137,7 @@ func (b *KubeAuthBackend) pathRoleDelete(req *logical.Request, data *framework.F
 	defer b.l.Unlock()
 
 	// Delete the role itself
-	if err = req.Storage.Delete("role/" + strings.ToLower(roleName)); err != nil {
+	if err := req.Storage.Delete("role/" + strings.ToLower(roleName)); err != nil {
 		return nil, err
 	}
 
@@ -152,7 +153,7 @@ func (b *KubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 	}
 
 	// Check if the role already exists
-	role, err := b.roleEntry(req.Storage, roleName)
+	role, err := b.role(req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}
@@ -190,26 +191,26 @@ func (b *KubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 	}
 
 	if tokenTTLRaw, ok := data.GetOk("token_ttl"); ok {
-		role.TokenTTL = time.Second * time.Duration(tokenTTLRaw.(int))
+		role.TTL = time.Second * time.Duration(tokenTTLRaw.(int))
 	} else if req.Operation == logical.CreateOperation {
-		role.TokenTTL = time.Second * time.Duration(data.Get("token_ttl").(int))
+		role.TTL = time.Second * time.Duration(data.Get("token_ttl").(int))
 	}
 
 	if tokenMaxTTLRaw, ok := data.GetOk("token_max_ttl"); ok {
-		role.TokenMaxTTL = time.Second * time.Duration(tokenMaxTTLRaw.(int))
+		role.MaxTTL = time.Second * time.Duration(tokenMaxTTLRaw.(int))
 	} else if req.Operation == logical.CreateOperation {
-		role.TokenMaxTTL = time.Second * time.Duration(data.Get("token_max_ttl").(int))
+		role.MaxTTL = time.Second * time.Duration(data.Get("token_max_ttl").(int))
 	}
 
-	// Check that the TokenTTL value provided is less than the TokenMaxTTL.
+	// Check that the TTL value provided is less than the MaxTTL.
 	// Sanitizing the TTL and MaxTTL is not required now and can be performed
 	// at credential issue time.
-	if role.TokenMaxTTL > time.Duration(0) && role.TokenTTL > role.TokenMaxTTL {
+	if role.MaxTTL > time.Duration(0) && role.TTL > role.MaxTTL {
 		return logical.ErrorResponse("token_ttl should not be greater than token_max_ttl"), nil
 	}
 
 	var resp *logical.Response
-	if role.TokenMaxTTL > b.System().MaxLeaseTTL() {
+	if role.MaxTTL > b.System().MaxLeaseTTL() {
 		resp = &logical.Response{}
 		resp.AddWarning("token_max_ttl is greater than the backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
 	}
@@ -237,7 +238,7 @@ func (b *KubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 	if entry == nil {
 		return nil, fmt.Errorf("failed to create storage entry for role %s", roleName)
 	}
-	if err = s.Put(entry); err != nil {
+	if err = req.Storage.Put(entry); err != nil {
 		return nil, err
 	}
 
@@ -253,10 +254,10 @@ type roleStorageEntry struct {
 	TokenNumUses int `json:"token_num_uses" mapstructure:"token_num_uses" structs:"token_num_uses"`
 
 	// Duration before which an issued token must be renewed
-	TokenTTL time.Duration `json:"token_ttl" structs:"token_ttl" mapstructure:"token_ttl"`
+	TTL time.Duration `json:"ttl" structs:"ttl" mapstructure:"ttl"`
 
 	// Duration after which an issued token should not be allowed to be renewed
-	TokenMaxTTL time.Duration `json:"token_max_ttl" structs:"token_max_ttl" mapstructure:"token_max_ttl"`
+	MaxTTL time.Duration `json:"max_ttl" structs:"max_ttl" mapstructure:"max_ttl"`
 
 	// Period, if set, indicates that the token generated using this role
 	// should never expire. The token should be renewed within the duration
@@ -268,4 +269,23 @@ type roleStorageEntry struct {
 	ServiceAccountUUIDs []string `json:"service_account_uuids" mapstructure:"service_account_uuids" structs:"service_account_uuids"`
 
 	ServiceAccountNamespaces []string `json:"service_account_namespaces" mapstructure:"service_account_namespaces" structs:"service_account_namespaces"`
+}
+
+var roleHelp = map[string][2]string{
+	"role-list": {
+		"Lists all the roles registered with the backend.",
+		"The list will contain the names of the roles.",
+	},
+	"role": {
+		"Register an role with the backend.",
+		`A role can represent a service, a machine or anything that can be IDed.
+The set of policies on the role defines access to the role, meaning, any
+Vault token with a policy set that is a superset of the policies on the
+role registered here will have access to the role. If a SecretID is desired
+to be generated against only this specific role, it can be done via
+'role/<role_name>/secret-id' and 'role/<role_name>/custom-secret-id' endpoints.
+The properties of the SecretID created against the role and the properties
+of the token issued with the SecretID generated againt the role, can be
+configured using the parameters of this endpoint.`,
+	},
 }

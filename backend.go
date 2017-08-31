@@ -2,6 +2,8 @@ package kubeauth
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/vault/logical"
@@ -35,7 +37,7 @@ func Backend() *KubeAuthBackend {
 		AuthRenew:   b.pathLoginRenew,
 		BackendType: logical.TypeCredential,
 		Invalidate:  b.invalidate,
-		Help:        backendHelp,
+		//Help:        backendHelp,
 		PathsSpecial: &logical.Paths{
 			Unauthenticated: []string{
 				"login",
@@ -70,6 +72,9 @@ func (b *KubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	if raw == nil {
+		return nil, nil
+	}
 
 	conf := &kubeConfig{}
 	if err := json.Unmarshal(raw.Value, conf); err != nil {
@@ -82,4 +87,21 @@ func (b *KubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 	}
 
 	return conf, nil
+}
+
+func (b *KubeAuthBackend) role(s logical.Storage, name string) (*roleStorageEntry, error) {
+	raw, err := s.Get(fmt.Sprintf("%s%s", rolePrefix, strings.ToLower(name)))
+	if err != nil {
+		return nil, err
+	}
+	if raw == nil {
+		return nil, nil
+	}
+
+	role := &roleStorageEntry{}
+	if err := json.Unmarshal(raw.Value, role); err != nil {
+		return nil, err
+	}
+
+	return role, nil
 }
