@@ -28,9 +28,9 @@ func pathsRole(b *KubeAuthBackend) []*framework.Path {
 					Type:        framework.TypeString,
 					Description: "Name of the role.",
 				},
-				"service_account_uuids": &framework.FieldSchema{
+				"service_account_names": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
-					Description: `Comma separated list of service account uuids able to access this role.`,
+					Description: `Comma separated list of service account names able to access this role.`,
 				},
 				"service_account_namespaces": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
@@ -41,16 +41,16 @@ func pathsRole(b *KubeAuthBackend) []*framework.Path {
 					Default:     "default",
 					Description: "Comma separated list of policies on the role.",
 				},
-				"token_num_uses": &framework.FieldSchema{
+				"num_uses": &framework.FieldSchema{
 					Type:        framework.TypeInt,
 					Description: `Number of times issued tokens can be used`,
 				},
-				"token_ttl": &framework.FieldSchema{
+				"ttl": &framework.FieldSchema{
 					Type: framework.TypeDurationSecond,
 					Description: `Duration in seconds after which the issued token should expire. Defaults
 to 0, in which case the value will fall back to the system/mount defaults.`,
 				},
-				"token_max_ttl": &framework.FieldSchema{
+				"max_ttl": &framework.FieldSchema{
 					Type: framework.TypeDurationSecond,
 					Description: `Duration in seconds after which the issued token should not be allowed to
 be renewed. Defaults to 0, in which case the value will fall back to the system/mount defaults.`,
@@ -181,53 +181,56 @@ func (b *KubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 		return logical.ErrorResponse(fmt.Sprintf("'period' of '%s' is greater than the backend's maximum lease TTL of '%s'", role.Period.String(), b.System().MaxLeaseTTL().String())), nil
 	}
 
-	if tokenNumUsesRaw, ok := data.GetOk("token_num_uses"); ok {
+	if tokenNumUsesRaw, ok := data.GetOk("num_uses"); ok {
 		role.TokenNumUses = tokenNumUsesRaw.(int)
 	} else if req.Operation == logical.CreateOperation {
-		role.TokenNumUses = data.Get("token_num_uses").(int)
+		role.TokenNumUses = data.Get("num_uses").(int)
 	}
 	if role.TokenNumUses < 0 {
-		return logical.ErrorResponse("token_num_uses cannot be negative"), nil
+		return logical.ErrorResponse("num_uses cannot be negative"), nil
 	}
 
-	if tokenTTLRaw, ok := data.GetOk("token_ttl"); ok {
+	if tokenTTLRaw, ok := data.GetOk("ttl"); ok {
 		role.TTL = time.Second * time.Duration(tokenTTLRaw.(int))
 	} else if req.Operation == logical.CreateOperation {
-		role.TTL = time.Second * time.Duration(data.Get("token_ttl").(int))
+		role.TTL = time.Second * time.Duration(data.Get("ttl").(int))
 	}
 
-	if tokenMaxTTLRaw, ok := data.GetOk("token_max_ttl"); ok {
+	if tokenMaxTTLRaw, ok := data.GetOk("max_ttl"); ok {
 		role.MaxTTL = time.Second * time.Duration(tokenMaxTTLRaw.(int))
 	} else if req.Operation == logical.CreateOperation {
-		role.MaxTTL = time.Second * time.Duration(data.Get("token_max_ttl").(int))
+		role.MaxTTL = time.Second * time.Duration(data.Get("max_ttl").(int))
 	}
 
 	// Check that the TTL value provided is less than the MaxTTL.
 	// Sanitizing the TTL and MaxTTL is not required now and can be performed
 	// at credential issue time.
 	if role.MaxTTL > time.Duration(0) && role.TTL > role.MaxTTL {
-		return logical.ErrorResponse("token_ttl should not be greater than token_max_ttl"), nil
+		return logical.ErrorResponse("ttl should not be greater than max_ttl"), nil
 	}
 
 	var resp *logical.Response
 	if role.MaxTTL > b.System().MaxLeaseTTL() {
 		resp = &logical.Response{}
-		resp.AddWarning("token_max_ttl is greater than the backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
+		resp.AddWarning("max_ttl is greater than the backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
 	}
 
-	if serviceAccountUUIDs, ok := data.GetOk("service_account_uuids"); ok {
-		role.ServiceAccountUUIDs = serviceAccountUUIDs.([]string)
+	if serviceAccountUUIDs, ok := data.GetOk("service_account_names"); ok {
+		role.ServiceAccountNames = serviceAccountUUIDs.([]string)
 	} else if req.Operation == logical.CreateOperation {
-		role.ServiceAccountUUIDs = data.Get("service_account_uuids").([]string)
+		role.ServiceAccountNames = data.Get("service_account_uuids").([]string)
 	}
-	if len(role.ServiceAccountUUIDs) == 0 {
-		return logical.ErrorResponse("\"service_account_uuids\" can not be empty"), nil
+	if len(role.ServiceAccountNames) == 0 {
+		return logical.ErrorResponse("\"service_account_names\" can not be empty"), nil
 	}
 
 	if namespaces, ok := data.GetOk("service_account_namespaces"); ok {
 		role.ServiceAccountNamespaces = namespaces.([]string)
 	} else if req.Operation == logical.CreateOperation {
 		role.ServiceAccountNamespaces = data.Get("service_account_namespaces").([]string)
+	}
+	if len(role.ServiceAccountNamespaces) == 0 {
+		return logical.ErrorResponse("\"service_account_namespaces\" can not be empty"), nil
 	}
 
 	// Store the entry.
@@ -266,7 +269,7 @@ type roleStorageEntry struct {
 	// a token will pick up the new value during its next renewal.
 	Period time.Duration `json:"period" mapstructure:"period" structs:"period"`
 
-	ServiceAccountUUIDs []string `json:"service_account_uuids" mapstructure:"service_account_uuids" structs:"service_account_uuids"`
+	ServiceAccountNames []string `json:"service_account_names" mapstructure:"service_account_names" structs:"service_account_names"`
 
 	ServiceAccountNamespaces []string `json:"service_account_namespaces" mapstructure:"service_account_namespaces" structs:"service_account_namespaces"`
 }

@@ -166,7 +166,7 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorage
 					return errors.New("namespace not authorized")
 				}
 
-				if !strutil.StrListContains(role.ServiceAccountUUIDs, serviceAccount.UID) {
+				if !strutil.StrListContains(role.ServiceAccountNames, serviceAccount.UID) {
 					return errors.New("service account uid not authorized")
 				}
 
