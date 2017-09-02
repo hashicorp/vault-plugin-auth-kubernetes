@@ -112,69 +112,90 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 }
 
 func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
-	// Parse Headers and verify the signing method matches the public key type
-	// configured. This is done in its own scope since we don't need any of
-	// these variables later.
-	{
-		parsedJWS, err := jws.Parse(jwtBytes)
+
+	verifyFunc := func(cert interface{}) (*serviceAccount, error) {
+		// Parse Headers and verify the signing method matches the public key type
+		// configured. This is done in its own scope since we don't need any of
+		// these variables later.
+		var signingMethod crypto.SigningMethod
+		{
+			parsedJWS, err := jws.Parse(jwtBytes)
+			if err != nil {
+				return nil, err
+			}
+			headers := parsedJWS.Protected()
+
+			var algStr string
+			if headers.Has("alg") {
+				algStr = headers.Get("alg").(string)
+			} else {
+				return nil, errors.New("provided JWT must have 'alg' header value")
+			}
+
+			signingMethod = jws.GetSigningMethod(algStr)
+			switch signingMethod.(type) {
+			case *crypto.SigningMethodECDSA:
+				if _, ok := cert.(*ecdsa.PublicKey); !ok {
+					return nil, errMismatchedSigningMethod
+				}
+			case *crypto.SigningMethodRSA:
+				if _, ok := cert.(*rsa.PublicKey); !ok {
+					return nil, errMismatchedSigningMethod
+				}
+			}
+		}
+
+		// Parse claims
+		parsedJWT, err := jws.ParseJWT(jwtBytes)
 		if err != nil {
 			return nil, err
 		}
-		headers := parsedJWS.Protected()
 
-		var algStr string
-		if headers.Has("alg") {
-			algStr = headers.Get("alg").(string)
-		} else {
-			return nil, errors.New("provided JWT must have 'alg' header value")
+		var serviceAccount *serviceAccount = &serviceAccount{}
+		validator := &jwt.Validator{
+			Expected: jwt.Claims{
+				"iss": expectedJWTIssuer,
+			},
+			Fn: func(c jwt.Claims) error {
+				err := mapstructure.Decode(c, serviceAccount)
+				if err != nil {
+					return err
+				}
+
+				if len(role.ServiceAccountNamespaces) > 0 && !strutil.StrListContains(role.ServiceAccountNamespaces, serviceAccount.Namespace) {
+					return errors.New("namespace not authorized")
+				}
+
+				if !strutil.StrListContains(role.ServiceAccountUUIDs, serviceAccount.UID) {
+					return errors.New("service account uid not authorized")
+				}
+
+				return serviceAccount.lookup()
+			},
 		}
 
-		switch jws.GetSigningMethod(algStr).(type) {
-		case *crypto.SigningMethodECDSA:
-			if _, ok := config.Certificate.(*ecdsa.PublicKey); !ok {
-				return nil, errMismatchedSigningMethod
-			}
-		case *crypto.SigningMethodRSA:
-			if _, ok := config.Certificate.(*rsa.PublicKey); !ok {
-				return nil, errMismatchedSigningMethod
-			}
+		if err := parsedJWT.Validate(cert, signingMethod, validator); err != nil {
+			return nil, err
+		}
+
+		return serviceAccount, nil
+	}
+
+	var validationErr error
+	for _, cert := range config.Certificates {
+		serviceAccount, err := verifyFunc(cert)
+		switch err {
+		case nil:
+			return serviceAccount, nil
+		case rsa.ErrVerification, crypto.ErrECDSAVerification:
+			validationErr = err
+			continue
+		default:
+			return nil, err
 		}
 	}
 
-	// Parse claims
-	parsedJWT, err := jws.ParseJWT(jwtBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	var serviceAccount *serviceAccount = &serviceAccount{}
-	validator := &jwt.Validator{
-		Expected: jwt.Claims{
-			"iss": expectedJWTIssuer,
-		},
-		Fn: func(c jwt.Claims) error {
-			err := mapstructure.Decode(c, serviceAccount)
-			if err != nil {
-				return err
-			}
-
-			if len(role.ServiceAccountNamespaces) > 0 && !strutil.StrListContains(role.ServiceAccountNamespaces, serviceAccount.Namespace) {
-				return errors.New("namespace not authorized")
-			}
-
-			if !strutil.StrListContains(role.ServiceAccountUUIDs, serviceAccount.UID) {
-				return errors.New("service account uid not authorized")
-			}
-
-			return serviceAccount.lookup()
-		},
-	}
-
-	if err := parsedJWT.Validate(config.Certificate.(*rsa.PublicKey), crypto.SigningMethodRS256, validator); err != nil {
-		return nil, err
-	}
-
-	return serviceAccount, nil
+	return nil, validationErr
 }
 
 type serviceAccount struct {
@@ -185,6 +206,13 @@ type serviceAccount struct {
 }
 
 func (s *serviceAccount) lookup() error {
+	/*
+		clientConfig = client.Config{}
+		clientConfig.Host = "example.com:4901"
+		clientConfig = info.MergeWithConfig()
+		client := client.New(clientConfig)
+		client.Pods(ns).List()
+	*/
 	return nil
 }
 

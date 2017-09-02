@@ -18,8 +18,8 @@ func pathConfig(b *KubeAuthBackend) *framework.Path {
 	return &framework.Path{
 		Pattern: "config$",
 		Fields: map[string]*framework.FieldSchema{
-			"certificate": {
-				Type:        framework.TypeString,
+			"certificates": {
+				Type:        framework.TypeCommaStringSlice,
 				Description: "The PEM-formated certificate used to sign kubernetes service account JWTs",
 			},
 		},
@@ -35,22 +35,26 @@ func pathConfig(b *KubeAuthBackend) *framework.Path {
 
 func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-		pemBytes := data.Get("certificate").(string)
-		if pemBytes == "" {
+		pemBytesList := data.Get("certificates").([]string)
+		if len(pemBytesList) == 0 {
 			return logical.ErrorResponse("no certificate provided"), nil
 		}
 
-		config := &kubeConfig{}
-
-		var err error
-		config.Certificate, err = ParsePublicKeyPEM([]byte(pemBytes))
-		if err != nil {
-			return logical.ErrorResponse(err.Error()), nil
+		config := &kubeConfig{
+			Certificates:      make([]interface{}, len(pemBytesList)),
+			CertificatesBytes: make([][]byte, len(pemBytesList)),
 		}
 
-		config.CertBytes, err = x509.MarshalPKIXPublicKey(config.Certificate)
-		if err != nil {
-			return nil, err
+		var err error
+		for i, pemBytes := range pemBytesList {
+			config.Certificates[i], err = ParsePublicKeyPEM([]byte(pemBytes))
+			if err != nil {
+				return logical.ErrorResponse(err.Error()), nil
+			}
+			config.CertificatesBytes[i], err = x509.MarshalPKIXPublicKey(config.Certificates[i])
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		entry, err := logical.StorageEntryJSON(configPath, config)
@@ -68,8 +72,8 @@ func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 // kubeConfig contains the public key certificate used to verify the signature
 // on the service account JWTs
 type kubeConfig struct {
-	Certificate interface{} `json:"-"`
-	CertBytes   []byte      `json:"cert_bytes"`
+	Certificates      []interface{} `json:"-"`
+	CertificatesBytes [][]byte      `json:"cert_bytes"`
 }
 
 const confHelpSyn = `Configure credentials used to query the GCP IAM API to verify authenticating service accounts`
@@ -151,7 +155,7 @@ func parseECPublicKey(data []byte) (*ecdsa.PublicKey, error) {
 
 	rsaPub, ok := raw.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, errors.New("could not parse RSA public key from data")
+		return nil, errors.New("could not parse ECDSA public key from data")
 	}
 
 	return rsaPub, nil
