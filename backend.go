@@ -81,6 +81,7 @@ func (b *KubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 		return nil, err
 	}
 
+	conf.Certificates = make([]interface{}, len(conf.CertificatesBytes))
 	for i, certBytes := range conf.CertificatesBytes {
 		conf.Certificates[i], err = ParsePublicKeyDER(certBytes)
 		if err != nil {

@@ -22,6 +22,10 @@ func pathConfig(b *KubeAuthBackend) *framework.Path {
 				Type:        framework.TypeCommaStringSlice,
 				Description: "The PEM-formated certificate used to sign kubernetes service account JWTs",
 			},
+			"kubernetes_host": {
+				Type:        framework.TypeString,
+				Description: "Host must be a host string, a host:port pair, or a URL to the base of the apiserver.",
+			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.UpdateOperation: b.pathConfigWrite(),
@@ -40,9 +44,15 @@ func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 			return logical.ErrorResponse("no certificate provided"), nil
 		}
 
+		host := data.Get("kubernetes_host").(string)
+		if host == "" {
+			return logical.ErrorResponse("no host provided"), nil
+		}
+
 		config := &kubeConfig{
 			Certificates:      make([]interface{}, len(pemBytesList)),
 			CertificatesBytes: make([][]byte, len(pemBytesList)),
+			Host:              host,
 		}
 
 		var err error
@@ -74,6 +84,7 @@ func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 type kubeConfig struct {
 	Certificates      []interface{} `json:"-"`
 	CertificatesBytes [][]byte      `json:"cert_bytes"`
+	Host              string        `json:"host"`
 }
 
 const confHelpSyn = `Configure credentials used to query the GCP IAM API to verify authenticating service accounts`

@@ -15,6 +15,11 @@ import (
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 	"github.com/mitchellh/mapstructure"
+
+	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 var (
@@ -25,6 +30,8 @@ var (
 	NamespaceClaim          string = "kubernetes.io/serviceaccount/namespace"
 
 	errMismatchedSigningMethod = errors.New("invalid signing method")
+
+	serviceAccountUsernameTpl string = "system:serviceaccount:%s:%s"
 )
 
 func pathLogin(b *KubeAuthBackend) *framework.Path {
@@ -80,7 +87,7 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 			return nil, errors.New("could not load backend configuration")
 		}
 
-		serviceAccount, err := b.parseAndValidateJWT([]byte(jwtStr), role, config)
+		serviceAccount, err := b.parseAndValidateJWT(jwtStr, role, config)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +118,7 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 	}
 }
 
-func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+func (b *KubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
 
 	verifyFunc := func(cert interface{}) (*serviceAccount, error) {
 		// Parse Headers and verify the signing method matches the public key type
@@ -119,7 +126,7 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorage
 		// these variables later.
 		var signingMethod crypto.SigningMethod
 		{
-			parsedJWS, err := jws.Parse(jwtBytes)
+			parsedJWS, err := jws.Parse([]byte(jwtStr))
 			if err != nil {
 				return nil, err
 			}
@@ -146,7 +153,7 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorage
 		}
 
 		// Parse claims
-		parsedJWT, err := jws.ParseJWT(jwtBytes)
+		parsedJWT, err := jws.ParseJWT([]byte(jwtStr))
 		if err != nil {
 			return nil, err
 		}
@@ -166,11 +173,11 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorage
 					return errors.New("namespace not authorized")
 				}
 
-				if !strutil.StrListContains(role.ServiceAccountNames, serviceAccount.UID) {
-					return errors.New("service account uid not authorized")
+				if !strutil.StrListContains(role.ServiceAccountNames, serviceAccount.Name) {
+					return errors.New("service account name not authorized")
 				}
 
-				return serviceAccount.lookup()
+				return serviceAccount.lookup(jwtStr, config)
 			},
 		}
 
@@ -187,7 +194,7 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtBytes []byte, role *roleStorage
 		switch err {
 		case nil:
 			return serviceAccount, nil
-		case rsa.ErrVerification, crypto.ErrECDSAVerification:
+		case rsa.ErrVerification, crypto.ErrECDSAVerification, errMismatchedSigningMethod:
 			validationErr = err
 			continue
 		default:
@@ -205,14 +212,48 @@ type serviceAccount struct {
 	Namespace  string `mapstructure:"kubernetes.io/serviceaccount/namespace"`
 }
 
-func (s *serviceAccount) lookup() error {
-	/*
-		clientConfig = client.Config{}
-		clientConfig.Host = "example.com:4901"
-		clientConfig = info.MergeWithConfig()
-		client := client.New(clientConfig)
-		client.Pods(ns).List()
-	*/
+func (s *serviceAccount) lookup(jwtStr string, config *kubeConfig) error {
+	clientConfig := &rest.Config{
+		BearerToken: jwtStr,
+		Host:        config.Host,
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+		},
+	}
+	clientset, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	sa, err := clientset.CoreV1().ServiceAccounts(s.Namespace).Get(s.Name, metav1.GetOptions{})
+	switch {
+	case kubeerrors.IsNotFound(err):
+		return errors.New("lookup failed: service account not found")
+	case err != nil:
+		return err
+	default:
+	}
+
+	if sa.ObjectMeta.DeletionTimestamp != nil {
+		return errors.New("lookup failed: service account deleted")
+	}
+	if string(sa.ObjectMeta.UID) != s.UID {
+		return errors.New("lookup failed: service account changed")
+	}
+
+	secret, err := clientset.CoreV1().Secrets(s.Namespace).Get(s.SecretName, metav1.GetOptions{})
+	switch {
+	case kubeerrors.IsNotFound(err):
+		return errors.New("lookup failed: secret not found")
+	case err != nil:
+		return err
+	default:
+	}
+
+	if secret.ObjectMeta.DeletionTimestamp != nil {
+		return errors.New("lookup failed: secret deleted")
+	}
+
 	return nil
 }
 

@@ -218,7 +218,7 @@ func (b *KubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 	if serviceAccountUUIDs, ok := data.GetOk("service_account_names"); ok {
 		role.ServiceAccountNames = serviceAccountUUIDs.([]string)
 	} else if req.Operation == logical.CreateOperation {
-		role.ServiceAccountNames = data.Get("service_account_uuids").([]string)
+		role.ServiceAccountNames = data.Get("service_account_names").([]string)
 	}
 	if len(role.ServiceAccountNames) == 0 {
 		return logical.ErrorResponse("\"service_account_names\" can not be empty"), nil
