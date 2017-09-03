@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -226,14 +227,17 @@ func (s *serviceAccount) lookup(jwtStr string, config *kubeConfig) error {
 	}
 
 	sa, err := clientset.CoreV1().ServiceAccounts(s.Namespace).Get(s.Name, metav1.GetOptions{})
+	log.Println(sa, err)
 	switch {
-	case kubeerrors.IsNotFound(err):
+	case kubeerrors.IsNotFound(err), kubeerrors.IsUnauthorized(err):
 		return errors.New("lookup failed: service account not found")
 	case err != nil:
 		return err
 	default:
 	}
 
+	// TODO: Is any of this necessary? If the token is deteled in kube simply
+	// trying to access the api might be enough.
 	if sa.ObjectMeta.DeletionTimestamp != nil {
 		return errors.New("lookup failed: service account deleted")
 	}
@@ -243,7 +247,7 @@ func (s *serviceAccount) lookup(jwtStr string, config *kubeConfig) error {
 
 	secret, err := clientset.CoreV1().Secrets(s.Namespace).Get(s.SecretName, metav1.GetOptions{})
 	switch {
-	case kubeerrors.IsNotFound(err):
+	case kubeerrors.IsNotFound(err), kubeerrors.IsUnauthorized(err):
 		return errors.New("lookup failed: secret not found")
 	case err != nil:
 		return err
