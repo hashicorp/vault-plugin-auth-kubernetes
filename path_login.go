@@ -10,9 +10,9 @@ import (
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 
-	authv1 "k8s.io/api/authentication/v1"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
+	authv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -120,7 +120,7 @@ func (b *KubeAuthBackend) lookupJWT(jwtStr string, config *kubeConfig) (*service
 		return nil, err
 	}
 
-	r, err := clientset.Authentication().TokenReviews().Create(&authv1.TokenReview{
+	r, err := clientset.AuthenticationV1().TokenReviews().Create(&authv1.TokenReview{
 		Spec: authv1.TokenReviewSpec{
 			Token: jwtStr,
 		},

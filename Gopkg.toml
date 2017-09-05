@@ -28,3 +28,8 @@
 [[constraint]]
   branch = "master"
   name = "github.com/mitchellh/mapstructure"
+
+[[constraint]]
+  branch = "release-1.7"
+  name = "k8s.io/apimachinery"
+
