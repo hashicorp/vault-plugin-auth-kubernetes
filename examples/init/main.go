@@ -19,7 +19,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	s, err := vaultClient.Logical().Write("/v1/auth/kube/login", map[string]interface{}{
+	s, err := vaultClient.Logical().Write("/auth/kube/login", map[string]interface{}{
 		"role": "dev",
 		"jwt":  "",
 	})
