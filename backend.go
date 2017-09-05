@@ -36,7 +36,6 @@ func Backend() *KubeAuthBackend {
 	b.Backend = &framework.Backend{
 		AuthRenew:   b.pathLoginRenew,
 		BackendType: logical.TypeCredential,
-		Invalidate:  b.invalidate,
 		//Help:        backendHelp,
 		PathsSpecial: &logical.Paths{
 			Unauthenticated: []string{
@@ -54,19 +53,6 @@ func Backend() *KubeAuthBackend {
 	return b
 }
 
-func (b *KubeAuthBackend) invalidate(key string) {
-	switch key {
-	case "config":
-		b.Close()
-	}
-}
-
-// Close deletes created GCP clients in backend.
-func (b *KubeAuthBackend) Close() {
-	b.l.Lock()
-	defer b.l.Unlock()
-}
-
 func (b *KubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 	raw, err := s.Get(configPath)
 	if err != nil {
@@ -79,14 +65,6 @@ func (b *KubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 	conf := &kubeConfig{}
 	if err := json.Unmarshal(raw.Value, conf); err != nil {
 		return nil, err
-	}
-
-	conf.Certificates = make([]interface{}, len(conf.CertificatesBytes))
-	for i, certBytes := range conf.CertificatesBytes {
-		conf.Certificates[i], err = ParsePublicKeyDER(certBytes)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return conf, nil

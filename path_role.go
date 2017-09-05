@@ -28,11 +28,11 @@ func pathsRole(b *KubeAuthBackend) []*framework.Path {
 					Type:        framework.TypeString,
 					Description: "Name of the role.",
 				},
-				"service_account_names": &framework.FieldSchema{
+				"bound_service_account_names": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
 					Description: `Comma separated list of service account names able to access this role.`,
 				},
-				"service_account_namespaces": &framework.FieldSchema{
+				"bound_service_account_namespaces": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
 					Description: "Comma separated list of namespaces allowed to access this role. If not set defaults to all namespaces.",
 				},
@@ -215,22 +215,22 @@ func (b *KubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 		resp.AddWarning("max_ttl is greater than the backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
 	}
 
-	if serviceAccountUUIDs, ok := data.GetOk("service_account_names"); ok {
+	if serviceAccountUUIDs, ok := data.GetOk("bound_service_account_names"); ok {
 		role.ServiceAccountNames = serviceAccountUUIDs.([]string)
 	} else if req.Operation == logical.CreateOperation {
-		role.ServiceAccountNames = data.Get("service_account_names").([]string)
+		role.ServiceAccountNames = data.Get("bound_service_account_names").([]string)
 	}
 	if len(role.ServiceAccountNames) == 0 {
-		return logical.ErrorResponse("\"service_account_names\" can not be empty"), nil
+		return logical.ErrorResponse("\"bound_service_account_names\" can not be empty"), nil
 	}
 
-	if namespaces, ok := data.GetOk("service_account_namespaces"); ok {
+	if namespaces, ok := data.GetOk("bound_service_account_namespaces"); ok {
 		role.ServiceAccountNamespaces = namespaces.([]string)
 	} else if req.Operation == logical.CreateOperation {
-		role.ServiceAccountNamespaces = data.Get("service_account_namespaces").([]string)
+		role.ServiceAccountNamespaces = data.Get("bound_service_account_namespaces").([]string)
 	}
 	if len(role.ServiceAccountNamespaces) == 0 {
-		return logical.ErrorResponse("\"service_account_namespaces\" can not be empty"), nil
+		return logical.ErrorResponse("\"bound_service_account_namespaces\" can not be empty"), nil
 	}
 
 	// Store the entry.
@@ -269,9 +269,9 @@ type roleStorageEntry struct {
 	// a token will pick up the new value during its next renewal.
 	Period time.Duration `json:"period" mapstructure:"period" structs:"period"`
 
-	ServiceAccountNames []string `json:"service_account_names" mapstructure:"service_account_names" structs:"service_account_names"`
+	ServiceAccountNames []string `json:"bound_service_account_names" mapstructure:"bound_service_account_names" structs:"bound_service_account_names"`
 
-	ServiceAccountNamespaces []string `json:"service_account_namespaces" mapstructure:"service_account_namespaces" structs:"service_account_namespaces"`
+	ServiceAccountNamespaces []string `json:"bound_service_account_namespaces" mapstructure:"bound_service_account_namespaces" structs:"bound_service_account_namespaces"`
 }
 
 var roleHelp = map[string][2]string{
