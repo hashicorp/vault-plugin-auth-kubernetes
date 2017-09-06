@@ -16,7 +16,7 @@ spec:
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: vault-token
-              mountPath: "/var/run/secrets/vaultproject.io"
+              mountPath: "/etc/example-app/"
         - name: consul-template
           image: "hashicorp/vault-example-sidecar-consul-template:0.0.1"
           imagePullPolicy: IfNotPresent
@@ -25,7 +25,7 @@ spec:
               value: "http://10.0.2.2:8200"
           volumeMounts:
             - name: vault-token
-              mountPath: "/var/run/secrets/vaultproject.io"
+              mountPath: "/etc/example-app/"
       volumes:
         - name: vault-token
           emptyDir: {}

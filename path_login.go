@@ -88,6 +88,9 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 				Persona: &logical.Persona{
 					Name: serviceAccount.UID,
 				},
+				InternalData: map[string]interface{}{
+					"role": roleName,
+				},
 				Policies: role.Policies,
 				Metadata: map[string]string{
 					"service_account_uid":       serviceAccount.UID,
@@ -156,7 +159,7 @@ type serviceAccount struct {
 
 // Invoked when the token issued by this backend is attempting a renewal.
 func (b *KubeAuthBackend) pathLoginRenew(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleName := req.Auth.InternalData["role_name"].(string)
+	roleName := req.Auth.InternalData["role"].(string)
 	if roleName == "" {
 		return nil, fmt.Errorf("failed to fetch role_name during renewal")
 	}
