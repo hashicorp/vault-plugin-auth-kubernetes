@@ -1,0 +1,19 @@
+apiVersion: apps/v1beta1
+kind: Deployment 
+metadata:
+  name: init-example
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: init-example 
+    spec:
+      serviceAccountName: vault-auth
+      containers:
+        - name: app 
+          image: "hashicorp/vault-example-init:0.0.1"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: VAULT_ADDR
+              value: "http://10.0.2.2:8200"
