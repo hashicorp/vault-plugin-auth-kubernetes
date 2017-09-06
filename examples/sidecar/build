@@ -1,0 +1,3 @@
+#!/bin/bash
+GOOS=linux go build \
+  -o vault-example-sidecar-app .

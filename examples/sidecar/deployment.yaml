@@ -1,0 +1,31 @@
+apiVersion: apps/v1beta1
+kind: Deployment 
+metadata:
+  name: vault-example-sidecar
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vault-example-sidecar 
+    spec:
+      serviceAccountName: vault-auth
+      containers:
+        - name: app 
+          image: "hashicorp/vault-example-sidecar-app:0.0.1"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: vault-token
+              mountPath: "/var/run/secrets/vaultproject.io"
+        - name: consul-template
+          image: "hashicorp/vault-example-sidecar-consul-template:0.0.1"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: VAULT_ADDR
+              value: "http://10.0.2.2:8200"
+          volumeMounts:
+            - name: vault-token
+              mountPath: "/var/run/secrets/vaultproject.io"
+      volumes:
+        - name: vault-token
+          emptyDir: {}

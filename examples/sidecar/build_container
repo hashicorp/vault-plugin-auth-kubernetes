@@ -1,0 +1,7 @@
+#!/bin/bash
+
+./build
+docker build -t hashicorp/vault-example-sidecar-app:0.0.1 .
+rm vault-example-sidecar-app
+
+docker build -t hashicorp/vault-example-sidecar-consul-template:0.0.1 -f Dockerfile-consul-template .

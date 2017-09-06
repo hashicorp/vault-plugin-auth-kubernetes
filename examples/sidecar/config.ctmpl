@@ -1,0 +1,7 @@
+{
+{{ with secret "secret/foo"}}
+{{ if .Data.password }}
+    "secret": "{{ .Data.password }}"
+{{ end }}
+{{ end }}
+} 
