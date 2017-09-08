@@ -1,19 +1,35 @@
 package kubeauth
 
 import (
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/SermoDigital/jose/crypto"
+	"github.com/SermoDigital/jose/jws"
+	"github.com/SermoDigital/jose/jwt"
 	"github.com/hashicorp/vault/helper/strutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
+	"github.com/mitchellh/mapstructure"
 
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	authv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 	"k8s.io/client-go/rest"
+)
+
+var (
+	expectedJWTIssuer       string = "kubernetes/serviceaccount"
+	ServiceAccountNameClaim string = "kubernetes.io/serviceaccount/service-account.name"
+	ServiceAccountUIDClaim  string = "kubernetes.io/serviceaccount/service-account.uid"
+	SecretNameClaim         string = "kubernetes.io/serviceaccount/secret.name"
+	NamespaceClaim          string = "kubernetes.io/serviceaccount/namespace"
+
+	errMismatchedSigningMethod = errors.New("invalid signing method")
 )
 
 func pathLogin(b *KubeAuthBackend) *framework.Path {
@@ -69,17 +85,9 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 			return nil, errors.New("could not load backend configuration")
 		}
 
-		serviceAccount, err := b.lookupJWT(jwtStr, config)
+		serviceAccount, err := b.parseAndValidateJWT(jwtStr, role, config)
 		if err != nil {
 			return nil, err
-		}
-
-		if !strutil.StrListContains(role.ServiceAccountNamespaces, serviceAccount.Namespace) {
-			return nil, errors.New("namespace not authorized")
-		}
-
-		if !strutil.StrListContains(role.ServiceAccountNames, serviceAccount.Name) {
-			return nil, errors.New("service account name not authorized")
 		}
 
 		resp := &logical.Response{
@@ -96,6 +104,7 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 					"service_account_uid":       serviceAccount.UID,
 					"service_account_name":      serviceAccount.Name,
 					"service_account_namespace": serviceAccount.Namespace,
+					"service_account_secret":    serviceAccount.SecretName,
 					"role": roleName,
 				},
 				DisplayName: serviceAccount.Name,
@@ -110,7 +119,101 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 	}
 }
 
-func (b *KubeAuthBackend) lookupJWT(jwtStr string, config *kubeConfig) (*serviceAccount, error) {
+func (b *KubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+
+	verifyFunc := func(cert interface{}) (*serviceAccount, error) {
+		// Parse Headers and verify the signing method matches the public key type
+		// configured. This is done in its own scope since we don't need any of
+		// these variables later.
+		var signingMethod crypto.SigningMethod
+		{
+			parsedJWS, err := jws.Parse([]byte(jwtStr))
+			if err != nil {
+				return nil, err
+			}
+			headers := parsedJWS.Protected()
+
+			var algStr string
+			if headers.Has("alg") {
+				algStr = headers.Get("alg").(string)
+			} else {
+				return nil, errors.New("provided JWT must have 'alg' header value")
+			}
+
+			signingMethod = jws.GetSigningMethod(algStr)
+			switch signingMethod.(type) {
+			case *crypto.SigningMethodECDSA:
+				if _, ok := cert.(*ecdsa.PublicKey); !ok {
+					return nil, errMismatchedSigningMethod
+				}
+			case *crypto.SigningMethodRSA:
+				if _, ok := cert.(*rsa.PublicKey); !ok {
+					return nil, errMismatchedSigningMethod
+				}
+			}
+		}
+
+		// Parse claims
+		parsedJWT, err := jws.ParseJWT([]byte(jwtStr))
+		if err != nil {
+			return nil, err
+		}
+
+		var serviceAccount *serviceAccount = &serviceAccount{}
+		validator := &jwt.Validator{
+			Expected: jwt.Claims{
+				"iss": expectedJWTIssuer,
+			},
+			Fn: func(c jwt.Claims) error {
+				err := mapstructure.Decode(c, serviceAccount)
+				if err != nil {
+					return err
+				}
+
+				if len(role.ServiceAccountNamespaces) > 0 && !strutil.StrListContains(role.ServiceAccountNamespaces, serviceAccount.Namespace) {
+					return errors.New("namespace not authorized")
+				}
+
+				if !strutil.StrListContains(role.ServiceAccountNames, serviceAccount.Name) {
+					return errors.New("service account name not authorized")
+				}
+
+				return serviceAccount.lookup(jwtStr, config)
+			},
+		}
+
+		if err := parsedJWT.Validate(cert, signingMethod, validator); err != nil {
+			return nil, err
+		}
+
+		return serviceAccount, nil
+	}
+
+	var validationErr error
+	for _, cert := range config.Certificates {
+		serviceAccount, err := verifyFunc(cert)
+		switch err {
+		case nil:
+			return serviceAccount, nil
+		case rsa.ErrVerification, crypto.ErrECDSAVerification, errMismatchedSigningMethod:
+			validationErr = err
+			continue
+		default:
+			return nil, err
+		}
+	}
+
+	return nil, validationErr
+}
+
+type serviceAccount struct {
+	Name       string `mapstructure:"kubernetes.io/serviceaccount/service-account.name"`
+	UID        string `mapstructure:"kubernetes.io/serviceaccount/service-account.uid"`
+	SecretName string `mapstructure:"kubernetes.io/serviceaccount/secret.name"`
+	Namespace  string `mapstructure:"kubernetes.io/serviceaccount/namespace"`
+}
+
+func (s *serviceAccount) lookup(jwtStr string, config *kubeConfig) error {
 	clientConfig := &rest.Config{
 		BearerToken: jwtStr,
 		Host:        config.Host,
@@ -120,7 +223,7 @@ func (b *KubeAuthBackend) lookupJWT(jwtStr string, config *kubeConfig) (*service
 	}
 	clientset, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	r, err := clientset.AuthenticationV1().TokenReviews().Create(&authv1.TokenReview{
@@ -130,31 +233,31 @@ func (b *KubeAuthBackend) lookupJWT(jwtStr string, config *kubeConfig) (*service
 	})
 	switch {
 	case kubeerrors.IsUnauthorized(err):
-		return nil, errors.New("lookup failed: service account deleted")
+		return errors.New("lookup failed: service account deleted")
 	case err != nil:
-		return nil, err
+		return err
 	default:
 	}
 	if !r.Status.Authenticated {
-		return nil, errors.New("lookup failed: service account jwt not valid")
+		return errors.New("lookup failed: service account jwt not valid")
 	}
 
 	parts := strings.Split(r.Status.User.Username, ":")
 	if len(parts) != 4 {
-		return nil, errors.New("lookup failed: unexpected username format")
+		return errors.New("lookup failed: unexpected username format")
 	}
 
-	return &serviceAccount{
-		Name:      parts[3],
-		UID:       string(r.Status.User.UID),
-		Namespace: parts[2],
-	}, nil
-}
+	if s.Name != parts[3] {
+		return errors.New("JWT data did not match")
+	}
+	if s.UID != string(r.Status.User.UID) {
+		return errors.New("JWT data did not match")
+	}
+	if s.Namespace != parts[2] {
+		return errors.New("JWT data did not match")
+	}
 
-type serviceAccount struct {
-	Name      string `mapstructure:"kubernetes.io/serviceaccount/service-account.name"`
-	UID       string `mapstructure:"kubernetes.io/serviceaccount/service-account.uid"`
-	Namespace string `mapstructure:"kubernetes.io/serviceaccount/namespace"`
+	return nil
 }
 
 // Invoked when the token issued by this backend is attempting a renewal.
