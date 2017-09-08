@@ -14,7 +14,9 @@ import (
 
 const warningACLReadAccess string = "Read access to this endpoint should be controlled via ACLs as it will return the configuration information as-is, including any passwords."
 
-func pathConfig(b *KubeAuthBackend) *framework.Path {
+// pathConfig returns the path configuration for CRUD operations on the backend
+// configuration.
+func pathConfig(b *kubeAuthBackend) *framework.Path {
 	return &framework.Path{
 		Pattern: "config$",
 		Fields: map[string]*framework.FieldSchema{
@@ -41,7 +43,8 @@ func pathConfig(b *KubeAuthBackend) *framework.Path {
 	}
 }
 
-func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
+// pathConfigWrite handles create and update commands to the config
+func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 		pemBytesList := data.Get("certificates").([]string)
 		if len(pemBytesList) == 0 {
@@ -87,12 +90,18 @@ func (b *KubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 // kubeConfig contains the public key certificate used to verify the signature
 // on the service account JWTs
 type kubeConfig struct {
-	Certificates      []interface{} `json:"-"`
-	CertificatesBytes [][]byte      `json:"cert_bytes"`
-	Host              string        `json:"host"`
-	CACert            string        `json:"ca_cert"`
+	// Certificates is the list of public key objects used to verify JWTs
+	Certificates []interface{} `json:"-"`
+	// CertificatesBytes is the list of public key bytes used to store the keys
+	// in storage.
+	CertificatesBytes [][]byte `json:"cert_bytes"`
+	// Host is the url string for the kubernetes API
+	Host string `json:"host"`
+	// CACert is the CA Cert to use to call into the kubernetes API
+	CACert string `json:"ca_cert"`
 }
 
+// PasrsePublickKeyPEM is used to parse RSA and ECDSA public keys from PEMs
 func ParsePublicKeyPEM(data []byte) (interface{}, error) {
 	var block *pem.Block
 	for {
@@ -107,6 +116,8 @@ func ParsePublicKeyPEM(data []byte) (interface{}, error) {
 	}
 }
 
+// ParsePublickKeyDER is used to parse RSA and ECDSA public keys from DER
+// formatted bytes.
 func ParsePublicKeyDER(data []byte) (interface{}, error) {
 	if publicKey, err := parseRSAPublicKey(data); err == nil {
 		return publicKey, nil

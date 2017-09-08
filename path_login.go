@@ -32,7 +32,8 @@ var (
 	errMismatchedSigningMethod = errors.New("invalid signing method")
 )
 
-func pathLogin(b *KubeAuthBackend) *framework.Path {
+// pathLogin returns the path configurations for login endpoints
+func pathLogin(b *kubeAuthBackend) *framework.Path {
 	return &framework.Path{
 		Pattern: "login$",
 		Fields: map[string]*framework.FieldSchema{
@@ -55,7 +56,8 @@ func pathLogin(b *KubeAuthBackend) *framework.Path {
 	}
 }
 
-func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
+// pathLogin is used to authenticate to this backend
+func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 		roleName := data.Get("role").(string)
 		if len(roleName) == 0 {
@@ -119,8 +121,11 @@ func (b *KubeAuthBackend) pathLogin() framework.OperationFunc {
 	}
 }
 
-func (b *KubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+// parseAndValidateJWT is used to parse, validate and lookup the JWT token.
+func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
 
+	// verifyFunc is called for each certificate that is configured in the
+	// backend until one of the certificates succeeds.
 	verifyFunc := func(cert interface{}) (*serviceAccount, error) {
 		// Parse Headers and verify the signing method matches the public key type
 		// configured. This is done in its own scope since we don't need any of
@@ -170,18 +175,22 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 					return err
 				}
 
-				if len(role.ServiceAccountNamespaces) > 0 && !strutil.StrListContains(role.ServiceAccountNamespaces, serviceAccount.Namespace) {
+				// verify the namespace is allowed
+				if !strutil.StrListContains(role.ServiceAccountNamespaces, serviceAccount.Namespace) {
 					return errors.New("namespace not authorized")
 				}
 
+				// verify the service account name is allowed
 				if !strutil.StrListContains(role.ServiceAccountNames, serviceAccount.Name) {
 					return errors.New("service account name not authorized")
 				}
 
+				// look up the JWT token in the kubernetes API
 				return serviceAccount.lookup(jwtStr, config)
 			},
 		}
 
+		// validates the signature and then runs the claim validation
 		if err := parsedJWT.Validate(cert, signingMethod, validator); err != nil {
 			return nil, err
 		}
@@ -190,12 +199,16 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 	}
 
 	var validationErr error
+	// for each configured certificate run the verifyFunc
 	for _, cert := range config.Certificates {
 		serviceAccount, err := verifyFunc(cert)
 		switch err {
 		case nil:
 			return serviceAccount, nil
 		case rsa.ErrVerification, crypto.ErrECDSAVerification, errMismatchedSigningMethod:
+			// if the error is a failure to verify or a signing method mismatch
+			// continue onto the next cert, storing the error to be returned if
+			// this is the last cert.
 			validationErr = err
 			continue
 		default:
@@ -206,6 +219,8 @@ func (b *KubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 	return nil, validationErr
 }
 
+// serviceAccount holds the metadata from the JWT token and is used to lookup
+// the JWT in the kubernetes API and compare the results.
 type serviceAccount struct {
 	Name       string `mapstructure:"kubernetes.io/serviceaccount/service-account.name"`
 	UID        string `mapstructure:"kubernetes.io/serviceaccount/service-account.uid"`
@@ -213,6 +228,8 @@ type serviceAccount struct {
 	Namespace  string `mapstructure:"kubernetes.io/serviceaccount/namespace"`
 }
 
+// lookup calls the TokenReview API in kubernetes to verify the token and secret
+// still exist.
 func (s *serviceAccount) lookup(jwtStr string, config *kubeConfig) error {
 	clientConfig := &rest.Config{
 		BearerToken: jwtStr,
@@ -233,20 +250,25 @@ func (s *serviceAccount) lookup(jwtStr string, config *kubeConfig) error {
 	})
 	switch {
 	case kubeerrors.IsUnauthorized(err):
+		// If the err is unauthorized that means the token has since been deleted
 		return errors.New("lookup failed: service account deleted")
 	case err != nil:
 		return err
 	default:
 	}
+
 	if !r.Status.Authenticated {
 		return errors.New("lookup failed: service account jwt not valid")
 	}
 
+	// the username is of format: system:serviceaccount:(NAMESPACE):(SERVICEACCOUNT)
 	parts := strings.Split(r.Status.User.Username, ":")
 	if len(parts) != 4 {
 		return errors.New("lookup failed: unexpected username format")
 	}
 
+	// Verify the returned metadata matches the expected data from the service
+	// account.
 	if s.Name != parts[3] {
 		return errors.New("JWT data did not match")
 	}
@@ -261,7 +283,7 @@ func (s *serviceAccount) lookup(jwtStr string, config *kubeConfig) error {
 }
 
 // Invoked when the token issued by this backend is attempting a renewal.
-func (b *KubeAuthBackend) pathLoginRenew(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *kubeAuthBackend) pathLoginRenew(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := req.Auth.InternalData["role"].(string)
 	if roleName == "" {
 		return nil, fmt.Errorf("failed to fetch role_name during renewal")

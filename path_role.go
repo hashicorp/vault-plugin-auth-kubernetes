@@ -11,7 +11,8 @@ import (
 	"github.com/hashicorp/vault/logical/framework"
 )
 
-func pathsRole(b *KubeAuthBackend) []*framework.Path {
+// pathsRole returns the path configurations for the CRUD operations on roles
+func pathsRole(b *kubeAuthBackend) []*framework.Path {
 	return []*framework.Path{
 		&framework.Path{
 			Pattern: "role/?",
@@ -78,7 +79,7 @@ TTL will be set to the value of this parameter.`,
 }
 
 // pathRoleExistenceCheck returns whether the role with the given name exists or not.
-func (b *KubeAuthBackend) pathRoleExistenceCheck(req *logical.Request, data *framework.FieldData) (bool, error) {
+func (b *kubeAuthBackend) pathRoleExistenceCheck(req *logical.Request, data *framework.FieldData) (bool, error) {
 	role, err := b.role(req.Storage, data.Get("role_name").(string))
 	if err != nil {
 		return false, err
@@ -87,7 +88,7 @@ func (b *KubeAuthBackend) pathRoleExistenceCheck(req *logical.Request, data *fra
 }
 
 // pathRoleList is used to list all the Roles registered with the backend.
-func (b *KubeAuthBackend) pathRoleList(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *kubeAuthBackend) pathRoleList(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	b.l.RLock()
 	defer b.l.RUnlock()
 
@@ -99,7 +100,7 @@ func (b *KubeAuthBackend) pathRoleList(req *logical.Request, data *framework.Fie
 }
 
 // pathRoleRead grabs a read lock and reads the options set on the role from the storage
-func (b *KubeAuthBackend) pathRoleRead(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *kubeAuthBackend) pathRoleRead(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("role_name").(string)
 	if roleName == "" {
 		return logical.ErrorResponse("missing role_name"), nil
@@ -125,8 +126,8 @@ func (b *KubeAuthBackend) pathRoleRead(req *logical.Request, data *framework.Fie
 	}
 }
 
-// pathRoleDelete removes the role from the storage
-func (b *KubeAuthBackend) pathRoleDelete(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+// pathRoleDelete removes the role from storage
+func (b *kubeAuthBackend) pathRoleDelete(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("role_name").(string)
 	if roleName == "" {
 		return logical.ErrorResponse("missing role_name"), nil
@@ -146,7 +147,7 @@ func (b *KubeAuthBackend) pathRoleDelete(req *logical.Request, data *framework.F
 
 // pathRoleCreateUpdate registers a new role with the backend or updates the options
 // of an existing role
-func (b *KubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *kubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("role_name").(string)
 	if roleName == "" {
 		return logical.ErrorResponse("missing role_name"), nil
@@ -269,8 +270,12 @@ type roleStorageEntry struct {
 	// a token will pick up the new value during its next renewal.
 	Period time.Duration `json:"period" mapstructure:"period" structs:"period"`
 
+	// ServiceAccountNames is the array of service accounts able to
+	// access this role.
 	ServiceAccountNames []string `json:"bound_service_account_names" mapstructure:"bound_service_account_names" structs:"bound_service_account_names"`
 
+	// ServiceAccountNamespaces is the array of namespaces able to access this
+	// role.
 	ServiceAccountNamespaces []string `json:"bound_service_account_namespaces" mapstructure:"bound_service_account_namespaces" structs:"bound_service_account_namespaces"`
 }
 

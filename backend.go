@@ -15,7 +15,8 @@ const (
 	rolePrefix string = "role/"
 )
 
-type KubeAuthBackend struct {
+// kubeAuthBackend implements logical backend
+type kubeAuthBackend struct {
 	*framework.Backend
 
 	l sync.RWMutex
@@ -30,8 +31,8 @@ func Factory(conf *logical.BackendConfig) (logical.Backend, error) {
 	return b, nil
 }
 
-func Backend() *KubeAuthBackend {
-	b := &KubeAuthBackend{}
+func Backend() *kubeAuthBackend {
+	b := &kubeAuthBackend{}
 
 	b.Backend = &framework.Backend{
 		AuthRenew:   b.pathLoginRenew,
@@ -53,7 +54,8 @@ func Backend() *KubeAuthBackend {
 	return b
 }
 
-func (b *KubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
+// config takes a storage object and returns a kubeConfig object
+func (b *kubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 	raw, err := s.Get(configPath)
 	if err != nil {
 		return nil, err
@@ -67,6 +69,7 @@ func (b *KubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 		return nil, err
 	}
 
+	// Parse the public keys from the CertificatesBytes
 	conf.Certificates = make([]interface{}, len(conf.CertificatesBytes))
 	for i, certBytes := range conf.CertificatesBytes {
 		conf.Certificates[i], err = ParsePublicKeyDER(certBytes)
@@ -78,7 +81,9 @@ func (b *KubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 	return conf, nil
 }
 
-func (b *KubeAuthBackend) role(s logical.Storage, name string) (*roleStorageEntry, error) {
+// role takes a storage backend and the name and returns the role's storage
+// entry
+func (b *kubeAuthBackend) role(s logical.Storage, name string) (*roleStorageEntry, error) {
 	raw, err := s.Get(fmt.Sprintf("%s%s", rolePrefix, strings.ToLower(name)))
 	if err != nil {
 		return nil, err
