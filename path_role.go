@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/hashicorp/vault/helper/policyutil"
+	"github.com/hashicorp/vault/helper/strutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
@@ -183,11 +184,11 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 	}
 
 	if tokenNumUsesRaw, ok := data.GetOk("num_uses"); ok {
-		role.TokenNumUses = tokenNumUsesRaw.(int)
+		role.NumUses = tokenNumUsesRaw.(int)
 	} else if req.Operation == logical.CreateOperation {
-		role.TokenNumUses = data.Get("num_uses").(int)
+		role.NumUses = data.Get("num_uses").(int)
 	}
-	if role.TokenNumUses < 0 {
+	if role.NumUses < 0 {
 		return logical.ErrorResponse("num_uses cannot be negative"), nil
 	}
 
@@ -221,8 +222,13 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 	} else if req.Operation == logical.CreateOperation {
 		role.ServiceAccountNames = data.Get("bound_service_account_names").([]string)
 	}
+	// Verify names was not empty
 	if len(role.ServiceAccountNames) == 0 {
 		return logical.ErrorResponse("\"bound_service_account_names\" can not be empty"), nil
+	}
+	// Verify * was not set with other data
+	if len(role.ServiceAccountNames) > 1 && strutil.StrListContains(role.ServiceAccountNames, "*") {
+		return logical.ErrorResponse("can not mix \"*\" with values"), nil
 	}
 
 	if namespaces, ok := data.GetOk("bound_service_account_namespaces"); ok {
@@ -230,8 +236,18 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 	} else if req.Operation == logical.CreateOperation {
 		role.ServiceAccountNamespaces = data.Get("bound_service_account_namespaces").([]string)
 	}
+	// Verify namespaces is not empty
 	if len(role.ServiceAccountNamespaces) == 0 {
 		return logical.ErrorResponse("\"bound_service_account_namespaces\" can not be empty"), nil
+	}
+	// Verify * was not set with other data
+	if len(role.ServiceAccountNamespaces) > 1 && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
+		return logical.ErrorResponse("can not mix \"*\" with values"), nil
+	}
+
+	// Verify that both names and namespaces are not set to "*"
+	if strutil.StrListContains(role.ServiceAccountNames, "*") && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
+		return logical.ErrorResponse("service_account_names and service_account_namespaces can not both be \"*\""), nil
 	}
 
 	// Store the entry.
@@ -255,7 +271,7 @@ type roleStorageEntry struct {
 	Policies []string `json:"policies" structs:"policies" mapstructure:"policies"`
 
 	// TokenNumUses defines the number of allowed uses of the token issued
-	TokenNumUses int `json:"token_num_uses" mapstructure:"token_num_uses" structs:"token_num_uses"`
+	NumUses int `json:"num_uses" mapstructure:"num_uses" structs:"num_uses"`
 
 	// Duration before which an issued token must be renewed
 	TTL time.Duration `json:"ttl" structs:"ttl" mapstructure:"ttl"`

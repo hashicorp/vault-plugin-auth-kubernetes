@@ -23,12 +23,11 @@ import (
 )
 
 var (
-	expectedJWTIssuer       string = "kubernetes/serviceaccount"
-	ServiceAccountNameClaim string = "kubernetes.io/serviceaccount/service-account.name"
-	ServiceAccountUIDClaim  string = "kubernetes.io/serviceaccount/service-account.uid"
-	SecretNameClaim         string = "kubernetes.io/serviceaccount/secret.name"
-	NamespaceClaim          string = "kubernetes.io/serviceaccount/namespace"
+	// expectedJWTIssuer is used to verify the iss header on the JWT.
+	expectedJWTIssuer string = "kubernetes/serviceaccount"
 
+	// errMismatchedSigningMethod is used if the certificate doesn't match the
+	// JWT's expected signing method.
 	errMismatchedSigningMethod = errors.New("invalid signing method")
 )
 
@@ -61,12 +60,12 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 		roleName := data.Get("role").(string)
 		if len(roleName) == 0 {
-			return logical.ErrorResponse("missing role_name"), logical.ErrInvalidRequest
+			return logical.ErrorResponse("missing role"), nil
 		}
 
 		jwtStr := data.Get("jwt").(string)
 		if len(jwtStr) == 0 {
-			return logical.ErrorResponse("missing jwt"), logical.ErrInvalidRequest
+			return logical.ErrorResponse("missing jwt"), nil
 		}
 
 		b.l.RLock()
@@ -94,7 +93,8 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 
 		resp := &logical.Response{
 			Auth: &logical.Auth{
-				Period: role.Period,
+				NumUses: role.NumUses,
+				Period:  role.Period,
 				Persona: &logical.Persona{
 					Name: serviceAccount.UID,
 				},
