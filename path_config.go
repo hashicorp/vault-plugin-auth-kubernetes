@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"fmt"
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -121,14 +120,11 @@ func ParsePublicKeyPEM(data []byte) (interface{}, error) {
 func ParsePublicKeyDER(data []byte) (interface{}, error) {
 	if publicKey, err := parseRSAPublicKey(data); err == nil {
 		return publicKey, nil
-	} else {
-		fmt.Println(err)
 	}
 	if publicKey, err := parseECPublicKey(data); err == nil {
 		return publicKey, nil
-	} else {
-		fmt.Println(err)
 	}
+
 	return nil, errors.New("data does not contain any valid RSA or ECDSA public keys")
 }
 

@@ -232,3 +232,61 @@ func TestPath_Read(t *testing.T) {
 		t.Fatalf("Unexpected role data: expected %#v\n got %#v\n", expected, resp.Data)
 	}
 }
+
+func TestPath_Delete(t *testing.T) {
+	b, storage := getBackend(t)
+
+	configData := map[string]interface{}{
+		"bound_service_account_names":      "name",
+		"bound_service_account_namespaces": "namespace",
+		"policies":                         "test",
+		"period":                           "3s",
+		"ttl":                              "1s",
+		"num_uses":                         12,
+		"max_ttl":                          "5s",
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "role/plugin-test",
+		Storage:   storage,
+		Data:      configData,
+	}
+
+	resp, err := b.HandleRequest(req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	req = &logical.Request{
+		Operation: logical.DeleteOperation,
+		Path:      "role/plugin-test",
+		Storage:   storage,
+		Data:      nil,
+	}
+
+	resp, err = b.HandleRequest(req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if resp != nil {
+		t.Fatalf("Unexpected resp data: expected nil got %#v\n", resp.Data)
+	}
+
+	req = &logical.Request{
+		Operation: logical.ReadOperation,
+		Path:      "role/plugin-test",
+		Storage:   storage,
+		Data:      nil,
+	}
+
+	resp, err = b.HandleRequest(req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if resp != nil {
+		t.Fatalf("Unexpected resp data: expected nil got %#v\n", resp.Data)
+	}
+}
