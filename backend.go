@@ -19,6 +19,8 @@ const (
 type kubeAuthBackend struct {
 	*framework.Backend
 
+	reviewFactory tokenReviewFactory
+
 	l sync.RWMutex
 }
 
@@ -51,6 +53,9 @@ func Backend() *kubeAuthBackend {
 			pathsRole(b),
 		),
 	}
+
+	b.reviewFactory = tokenReviewAPIFactory
+
 	return b
 }
 

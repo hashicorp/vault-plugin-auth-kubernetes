@@ -15,11 +15,6 @@ import (
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 	"github.com/mitchellh/mapstructure"
-
-	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/kubernetes"
-	authv1 "k8s.io/client-go/pkg/apis/authentication/v1"
-	"k8s.io/client-go/rest"
 )
 
 var (
@@ -128,7 +123,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 	// backend until one of the certificates succeeds.
 	verifyFunc := func(cert interface{}) (*serviceAccount, error) {
 		// Parse Headers and verify the signing method matches the public key type
-		// configured. This is done in its own scope since we don't need any of
+		// configured. This is done in its own scope since we don't need most of
 		// these variables later.
 		var signingMethod crypto.SigningMethod
 		{
@@ -158,7 +153,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 			}
 		}
 
-		// Parse claims
+		// Parse into JWT
 		parsedJWT, err := jws.ParseJWT([]byte(jwtStr))
 		if err != nil {
 			return nil, err
@@ -170,6 +165,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 				"iss": expectedJWTIssuer,
 			},
 			Fn: func(c jwt.Claims) error {
+				// Decode claims into a service account object
 				err := mapstructure.Decode(c, serviceAccount)
 				if err != nil {
 					return err
@@ -185,8 +181,10 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 					return errors.New("service account name not authorized")
 				}
 
+				tr := b.reviewFactory(config)
+
 				// look up the JWT token in the kubernetes API
-				return serviceAccount.lookup(jwtStr, config)
+				return serviceAccount.lookup(jwtStr, tr)
 			},
 		}
 
@@ -230,52 +228,21 @@ type serviceAccount struct {
 
 // lookup calls the TokenReview API in kubernetes to verify the token and secret
 // still exist.
-func (s *serviceAccount) lookup(jwtStr string, config *kubeConfig) error {
-	clientConfig := &rest.Config{
-		BearerToken: jwtStr,
-		Host:        config.Host,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: []byte(config.CACert),
-		},
-	}
-	clientset, err := kubernetes.NewForConfig(clientConfig)
+func (s *serviceAccount) lookup(jwtStr string, tr tokenReviewer) error {
+	r, err := tr.Review(jwtStr)
 	if err != nil {
 		return err
 	}
 
-	r, err := clientset.AuthenticationV1().TokenReviews().Create(&authv1.TokenReview{
-		Spec: authv1.TokenReviewSpec{
-			Token: jwtStr,
-		},
-	})
-	switch {
-	case kubeerrors.IsUnauthorized(err):
-		// If the err is unauthorized that means the token has since been deleted
-		return errors.New("lookup failed: service account deleted")
-	case err != nil:
-		return err
-	default:
-	}
-
-	if !r.Status.Authenticated {
-		return errors.New("lookup failed: service account jwt not valid")
-	}
-
-	// the username is of format: system:serviceaccount:(NAMESPACE):(SERVICEACCOUNT)
-	parts := strings.Split(r.Status.User.Username, ":")
-	if len(parts) != 4 {
-		return errors.New("lookup failed: unexpected username format")
-	}
-
 	// Verify the returned metadata matches the expected data from the service
 	// account.
-	if s.Name != parts[3] {
+	if s.Name != r.Name {
 		return errors.New("JWT data did not match")
 	}
-	if s.UID != string(r.Status.User.UID) {
+	if s.UID != r.UID {
 		return errors.New("JWT data did not match")
 	}
-	if s.Namespace != parts[2] {
+	if s.Namespace != r.Namespace {
 		return errors.New("JWT data did not match")
 	}
 
