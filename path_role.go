@@ -32,16 +32,16 @@ func pathsRole(b *kubeAuthBackend) []*framework.Path {
 				},
 				"bound_service_account_names": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
-					Description: `Comma separated list of service account names able to access this role.`,
+					Description: `List of service account names able to access this role.`,
 				},
 				"bound_service_account_namespaces": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
-					Description: "Comma separated list of namespaces allowed to access this role. If not set defaults to all namespaces.",
+					Description: "List of namespaces allowed to access this role. If not set defaults to all namespaces.",
 				},
 				"policies": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
 					Default:     "default",
-					Description: "Comma separated list of policies on the role.",
+					Description: "List of policies on the role.",
 				},
 				"num_uses": &framework.FieldSchema{
 					Type:        framework.TypeInt,
@@ -302,14 +302,9 @@ var roleHelp = map[string][2]string{
 	},
 	"role": {
 		"Register an role with the backend.",
-		`A role can represent a service, a machine or anything that can be IDed.
-The set of policies on the role defines access to the role, meaning, any
-Vault token with a policy set that is a superset of the policies on the
-role registered here will have access to the role. If a SecretID is desired
-to be generated against only this specific role, it can be done via
-'role/<role_name>/secret-id' and 'role/<role_name>/custom-secret-id' endpoints.
-The properties of the SecretID created against the role and the properties
-of the token issued with the SecretID generated againt the role, can be
-configured using the parameters of this endpoint.`,
+		`A role is required to authenticate with this backend. The role binds
+		kubernetes service account metadata with token policies and settings.
+		The bindings, token polices and token settings can all be configured
+		using this endpoint`,
 	},
 }

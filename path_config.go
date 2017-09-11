@@ -176,11 +176,10 @@ func parseECPublicKey(data []byte) (*ecdsa.PublicKey, error) {
 	return rsaPub, nil
 }
 
-const confHelpSyn = `Configure credentials used to query the GCP IAM API to verify authenticating service accounts`
+const confHelpSyn = `Configures the JWT Public Key and Kubernetes API information.`
 const confHelpDesc = `
-The GCP IAM auth backend makes queries to the GCP IAM auth backend to verify a service account
-attempting login. It verifies the service account exists and retrieves a public key to verify
-signed JWT requests passed in on login. The credentials should have the following permissions:
-iam AUTH:
-* iam.serviceAccountKeys.get
+The Kubernetes Auth backend validates service account JWTs and verifies their
+existence with the Kubernetes TokenReview API. This endpoint configures the
+public key used to validate the JWT signature and the necessary information to
+access the Kubernetes API.
 `
