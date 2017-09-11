@@ -1,12 +1,49 @@
 package kubeauth
 
 import (
-	"crypto/x509"
 	"reflect"
 	"testing"
 
 	"github.com/hashicorp/vault/logical"
 )
+
+func TestConfig_Read(t *testing.T) {
+	b, storage := getBackend(t)
+
+	data := map[string]interface{}{
+		"certificates":       []string{testRSACert, testECCert},
+		"kubernetes_host":    "host",
+		"kubernetes_ca_cert": testCACert,
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "config",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err := b.HandleRequest(req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	req = &logical.Request{
+		Operation: logical.ReadOperation,
+		Path:      "config",
+		Storage:   storage,
+		Data:      nil,
+	}
+
+	resp, err = b.HandleRequest(req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if !reflect.DeepEqual(resp.Data, data) {
+		t.Fatalf("Expected did not equal actual: expected %#v\n got %#v\n", data, resp.Data)
+	}
+}
 
 func TestConfig(t *testing.T) {
 	b, storage := getBackend(t)
@@ -93,16 +130,12 @@ func TestConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	certBytes, err := x509.MarshalPKIXPublicKey(cert)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	expected := &kubeConfig{
-		Certificates:      []interface{}{cert},
-		CertificatesBytes: [][]byte{certBytes},
-		Host:              "host",
-		CACert:            testCACert,
+		Certificates:    []interface{}{cert},
+		CertificatePEMs: []string{testRSACert},
+		Host:            "host",
+		CACert:          testCACert,
 	}
 
 	conf, err := b.(*kubeAuthBackend).config(storage)
@@ -137,23 +170,17 @@ func TestConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	certBytes, err = x509.MarshalPKIXPublicKey(cert)
-	if err != nil {
-		t.Fatal(err)
-	}
+
 	cert2, err := ParsePublicKeyPEM([]byte(testECCert))
 	if err != nil {
 		t.Fatal(err)
 	}
-	certBytes2, err := x509.MarshalPKIXPublicKey(cert2)
-	if err != nil {
-		t.Fatal(err)
-	}
+
 	expected = &kubeConfig{
-		Certificates:      []interface{}{cert, cert2},
-		CertificatesBytes: [][]byte{certBytes, certBytes2},
-		Host:              "host",
-		CACert:            testCACert,
+		Certificates:    []interface{}{cert, cert2},
+		CertificatePEMs: []string{testRSACert, testECCert},
+		Host:            "host",
+		CACert:          testCACert,
 	}
 
 	conf, err = b.(*kubeAuthBackend).config(storage)
@@ -166,48 +193,7 @@ func TestConfig(t *testing.T) {
 	}
 }
 
-func TestParseCert(t *testing.T) {
-	cert, err := ParsePublicKeyPEM([]byte(testRSACert))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	certBytes, err := x509.MarshalPKIXPublicKey(cert)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cert2, err := ParsePublicKeyDER(certBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(cert, cert2) {
-		t.Fatal("certs did not match")
-	}
-
-	cert, err = ParsePublicKeyPEM([]byte(testECCert))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	certBytes, err = x509.MarshalPKIXPublicKey(cert)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cert2, err = ParsePublicKeyDER(certBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(cert, cert2) {
-		t.Fatal("certs did not match")
-	}
-}
-
-var testRSACert string = `
------BEGIN CERTIFICATE-----
+var testRSACert string = `-----BEGIN CERTIFICATE-----
 MIIDcjCCAlqgAwIBAgIBAjANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDEwptaW5p
 a3ViZUNBMB4XDTE3MDgzMDE5MDgzNloXDTE4MDgzMDE5MDgzNlowLDEXMBUGA1UE
 ChMOc3lzdGVtOm1hc3RlcnMxETAPBgNVBAMTCG1pbmlrdWJlMIIBIjANBgkqhkiG
@@ -229,8 +215,7 @@ p7HP3k7caxfp346TZ/HgbV9sJEkHP7Ym7n9E7LSyUTSxXwBRPraH1WQzEgFNPSUV
 V0n6FBLiejOTPKapJ2F0tIqAyJHFug==
 -----END CERTIFICATE-----`
 
-var testECCert string = `
------BEGIN CERTIFICATE-----
+var testECCert string = `-----BEGIN CERTIFICATE-----
 MIICZDCCAeugAwIBAgIJALM9NbK8WRuBMAkGByqGSM49BAEwRTELMAkGA1UEBhMC
 dXMxEzARBgNVBAgTClNvbWUtU3RhdGUxITAfBgNVBAoTGEludGVybmV0IFdpZGdp
 dHMgUHR5IEx0ZDAeFw0xNzA5MTExNzQ2NDNaFw0yNzA5MDkxNzQ2NDNaMEUxCzAJ

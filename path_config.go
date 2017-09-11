@@ -35,6 +35,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.UpdateOperation: b.pathConfigWrite(),
 			logical.CreateOperation: b.pathConfigWrite(),
+			logical.ReadOperation:   b.pathConfigRead(),
 		},
 
 		HelpSynopsis:    confHelpSyn,
@@ -43,10 +44,32 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 }
 
 // pathConfigWrite handles create and update commands to the config
+func (b *kubeAuthBackend) pathConfigRead() framework.OperationFunc {
+	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+		if config, err := b.config(req.Storage); err != nil {
+			return nil, err
+		} else if config == nil {
+			return nil, nil
+		} else {
+			// Create a map of data to be returned
+			resp := &logical.Response{
+				Data: map[string]interface{}{
+					"certificates":       config.CertificatePEMs,
+					"kubernetes_host":    config.Host,
+					"kubernetes_ca_cert": config.CACert,
+				},
+			}
+
+			return resp, nil
+		}
+	}
+}
+
+// pathConfigWrite handles create and update commands to the config
 func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-		pemBytesList := data.Get("certificates").([]string)
-		if len(pemBytesList) == 0 {
+		pemList := data.Get("certificates").([]string)
+		if len(pemList) == 0 {
 			return logical.ErrorResponse("no certificate provided"), nil
 		}
 
@@ -56,21 +79,17 @@ func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 		}
 
 		config := &kubeConfig{
-			Certificates:      make([]interface{}, len(pemBytesList)),
-			CertificatesBytes: make([][]byte, len(pemBytesList)),
-			Host:              host,
-			CACert:            data.Get("kubernetes_ca_cert").(string),
+			Certificates:    make([]interface{}, len(pemList)),
+			CertificatePEMs: pemList,
+			Host:            host,
+			CACert:          data.Get("kubernetes_ca_cert").(string),
 		}
 
 		var err error
-		for i, pemBytes := range pemBytesList {
-			config.Certificates[i], err = ParsePublicKeyPEM([]byte(pemBytes))
+		for i, pem := range pemList {
+			config.Certificates[i], err = ParsePublicKeyPEM([]byte(pem))
 			if err != nil {
 				return logical.ErrorResponse(err.Error()), nil
-			}
-			config.CertificatesBytes[i], err = x509.MarshalPKIXPublicKey(config.Certificates[i])
-			if err != nil {
-				return nil, err
 			}
 		}
 
@@ -93,7 +112,7 @@ type kubeConfig struct {
 	Certificates []interface{} `json:"-"`
 	// CertificatesBytes is the list of public key bytes used to store the keys
 	// in storage.
-	CertificatesBytes [][]byte `json:"cert_bytes"`
+	CertificatePEMs []string `json:"certificate_pems"`
 	// Host is the url string for the kubernetes API
 	Host string `json:"host"`
 	// CACert is the CA Cert to use to call into the kubernetes API
@@ -109,23 +128,13 @@ func ParsePublicKeyPEM(data []byte) (interface{}, error) {
 			return nil, errors.New("data does not contain any valid RSA or ECDSA public keys")
 		}
 
-		if cert, err := ParsePublicKeyDER(block.Bytes); err == nil {
-			return cert, nil
+		if publicKey, err := parseRSAPublicKey(block.Bytes); err == nil {
+			return publicKey, nil
+		}
+		if publicKey, err := parseECPublicKey(block.Bytes); err == nil {
+			return publicKey, nil
 		}
 	}
-}
-
-// ParsePublickKeyDER is used to parse RSA and ECDSA public keys from DER
-// formatted bytes.
-func ParsePublicKeyDER(data []byte) (interface{}, error) {
-	if publicKey, err := parseRSAPublicKey(data); err == nil {
-		return publicKey, nil
-	}
-	if publicKey, err := parseECPublicKey(data); err == nil {
-		return publicKey, nil
-	}
-
-	return nil, errors.New("data does not contain any valid RSA or ECDSA public keys")
 }
 
 // parsePublicKey attempts to parse the given block data into a public key
