@@ -39,7 +39,7 @@ func Backend() *kubeAuthBackend {
 	b.Backend = &framework.Backend{
 		AuthRenew:   b.pathLoginRenew,
 		BackendType: logical.TypeCredential,
-		//Help:        backendHelp,
+		Help:        backendHelp,
 		PathsSpecial: &logical.Paths{
 			Unauthenticated: []string{
 				"login",
@@ -104,3 +104,7 @@ func (b *kubeAuthBackend) role(s logical.Storage, name string) (*roleStorageEntr
 
 	return role, nil
 }
+
+var backendHelp string = `
+The Kubernetes Auth Backend allows authentication for Kubernetes service accounts.
+`
