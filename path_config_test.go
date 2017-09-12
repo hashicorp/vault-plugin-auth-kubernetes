@@ -126,7 +126,7 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	cert, err := ParsePublicKeyPEM([]byte(testRSACert))
+	cert, err := parsePublicKeyPEM([]byte(testRSACert))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,12 +166,12 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	cert, err = ParsePublicKeyPEM([]byte(testRSACert))
+	cert, err = parsePublicKeyPEM([]byte(testRSACert))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cert2, err := ParsePublicKeyPEM([]byte(testECCert))
+	cert2, err := parsePublicKeyPEM([]byte(testECCert))
 	if err != nil {
 		t.Fatal(err)
 	}

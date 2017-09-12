@@ -77,7 +77,7 @@ func (b *kubeAuthBackend) config(s logical.Storage) (*kubeConfig, error) {
 	// Parse the public keys from the CertificatesBytes
 	conf.Certificates = make([]interface{}, len(conf.CertificatePEMs))
 	for i, cert := range conf.CertificatePEMs {
-		conf.Certificates[i], err = ParsePublicKeyPEM([]byte(cert))
+		conf.Certificates[i], err = parsePublicKeyPEM([]byte(cert))
 		if err != nil {
 			return nil, err
 		}

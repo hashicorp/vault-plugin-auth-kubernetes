@@ -90,7 +90,7 @@ func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 
 		var err error
 		for i, pem := range pemList {
-			config.Certificates[i], err = ParsePublicKeyPEM([]byte(pem))
+			config.Certificates[i], err = parsePublicKeyPEM([]byte(pem))
 			if err != nil {
 				return logical.ErrorResponse(err.Error()), nil
 			}
@@ -115,7 +115,7 @@ func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 type kubeConfig struct {
 	// Certificates is the list of public key objects used to verify JWTs
 	Certificates []interface{} `json:"-"`
-	// CertificatesBytes is the list of public key bytes used to store the keys
+	// CertificatePEMs is the list of public key PEMs used to store the keys
 	// in storage.
 	CertificatePEMs []string `json:"certificate_pems"`
 	// Host is the url string for the kubernetes API
@@ -125,7 +125,7 @@ type kubeConfig struct {
 }
 
 // PasrsePublickKeyPEM is used to parse RSA and ECDSA public keys from PEMs
-func ParsePublicKeyPEM(data []byte) (interface{}, error) {
+func parsePublicKeyPEM(data []byte) (interface{}, error) {
 	var block *pem.Block
 	for {
 		block, data = pem.Decode(data)

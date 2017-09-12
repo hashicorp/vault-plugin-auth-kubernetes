@@ -69,7 +69,8 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 		role, err := b.role(req.Storage, strings.ToLower(roleName))
 		if err != nil {
 			return nil, err
-		} else if role == nil {
+		}
+		if role == nil {
 			return logical.ErrorResponse(fmt.Sprintf("could not load role \"%s\"", roleName)), logical.ErrInvalidRequest
 		}
 
@@ -98,10 +99,10 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 				},
 				Policies: role.Policies,
 				Metadata: map[string]string{
-					"service_account_uid":       serviceAccount.UID,
-					"service_account_name":      serviceAccount.Name,
-					"service_account_namespace": serviceAccount.Namespace,
-					"service_account_secret":    serviceAccount.SecretName,
+					"service_account_uid":         serviceAccount.UID,
+					"service_account_name":        serviceAccount.Name,
+					"service_account_namespace":   serviceAccount.Namespace,
+					"service_account_secret_name": serviceAccount.SecretName,
 					"role": roleName,
 				},
 				DisplayName: serviceAccount.Name,
@@ -158,6 +159,8 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 				if _, ok := cert.(*rsa.PublicKey); !ok {
 					return nil, errMismatchedSigningMethod
 				}
+			default:
+				return nil, errors.New("unsupported JWT signing method")
 			}
 		}
 
@@ -167,7 +170,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 			return nil, err
 		}
 
-		var serviceAccount *serviceAccount = &serviceAccount{}
+		serviceAccount := &serviceAccount{}
 		validator := &jwt.Validator{
 			Expected: jwt.Claims{
 				"iss": expectedJWTIssuer,
@@ -287,9 +290,9 @@ func (b *kubeAuthBackend) pathLoginRenew(req *logical.Request, data *framework.F
 		// token will bear the updated 'Period' value as its TTL.
 		req.Auth.TTL = role.Period
 		return &logical.Response{Auth: req.Auth}, nil
-	} else {
-		return framework.LeaseExtend(role.TTL, role.MaxTTL, b.System())(req, data)
 	}
+
+	return framework.LeaseExtend(role.TTL, role.MaxTTL, b.System())(req, data)
 }
 
 const pathLoginHelpSyn = `Authenticates Kubernetes service accounts with Vault.`

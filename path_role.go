@@ -113,24 +113,26 @@ func (b *kubeAuthBackend) pathRoleRead(req *logical.Request, data *framework.Fie
 	b.l.RLock()
 	defer b.l.RUnlock()
 
-	if role, err := b.role(req.Storage, strings.ToLower(roleName)); err != nil {
+	role, err := b.role(req.Storage, strings.ToLower(roleName))
+	if err != nil {
 		return nil, err
-	} else if role == nil {
-		return nil, nil
-	} else {
-		// Convert the 'time.Duration' values to second.
-		role.TTL /= time.Second
-		role.MaxTTL /= time.Second
-		role.Period /= time.Second
-
-		// Create a map of data to be returned
-		data := structs.New(role).Map()
-		resp := &logical.Response{
-			Data: data,
-		}
-
-		return resp, nil
 	}
+	if role == nil {
+		return nil, nil
+	}
+
+	// Convert the 'time.Duration' values to second.
+	role.TTL /= time.Second
+	role.MaxTTL /= time.Second
+	role.Period /= time.Second
+
+	// Create a map of data to be returned
+	respData := structs.New(role).Map()
+	resp := &logical.Response{
+		Data: respData,
+	}
+
+	return resp, nil
 }
 
 // pathRoleDelete removes the role from storage
