@@ -112,6 +112,14 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 			},
 		}
 
+		// If 'Period' is set, use the value of 'Period' as the TTL.
+		// Otherwise, set the normal TTL.
+		if role.Period > time.Duration(0) {
+			resp.Auth.TTL = role.Period
+		} else {
+			resp.Auth.TTL = role.TTL
+		}
+
 		return resp, nil
 	}
 }

@@ -80,7 +80,7 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 
 	return &tokenReviewResult{
 		Name:      parts[3],
-		Namespace: parts[4],
+		Namespace: parts[2],
 		UID:       string(r.Status.User.UID),
 	}, nil
 }
