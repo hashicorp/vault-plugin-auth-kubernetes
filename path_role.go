@@ -81,6 +81,9 @@ TTL will be set to the value of this parameter.`,
 
 // pathRoleExistenceCheck returns whether the role with the given name exists or not.
 func (b *kubeAuthBackend) pathRoleExistenceCheck(req *logical.Request, data *framework.FieldData) (bool, error) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
 	role, err := b.role(req.Storage, data.Get("role_name").(string))
 	if err != nil {
 		return false, err
@@ -106,6 +109,9 @@ func (b *kubeAuthBackend) pathRoleRead(req *logical.Request, data *framework.Fie
 	if roleName == "" {
 		return logical.ErrorResponse("missing role_name"), nil
 	}
+
+	b.l.RLock()
+	defer b.l.RUnlock()
 
 	if role, err := b.role(req.Storage, strings.ToLower(roleName)); err != nil {
 		return nil, err
@@ -153,6 +159,9 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(req *logical.Request, data *frame
 	if roleName == "" {
 		return logical.ErrorResponse("missing role_name"), nil
 	}
+
+	b.l.Lock()
+	defer b.l.Unlock()
 
 	// Check if the role already exists
 	role, err := b.role(req.Storage, roleName)

@@ -61,12 +61,11 @@ func setupBackend(t *testing.T) (logical.Backend, logical.Storage) {
 
 func TestLogin(t *testing.T) {
 	b, storage := setupBackend(t)
-
 	b.(*kubeAuthBackend).reviewFactory = mockTokenReviewFactory(testName, testNamespace, testUID)
 
+	// Test bad inputs
 	data := map[string]interface{}{
-		"role": "plugin-test",
-		"jwt":  jwtData,
+		"jwt": jwtData,
 	}
 
 	req := &logical.Request{
@@ -77,6 +76,45 @@ func TestLogin(t *testing.T) {
 	}
 
 	resp, err := b.HandleRequest(req)
+	if resp == nil || !resp.IsError() {
+		t.Fatal("expected error")
+	}
+	if resp.Error().Error() != "missing role" {
+		t.Fatalf("unexected error: %s", resp.Error())
+	}
+
+	data = map[string]interface{}{
+		"role": "plugin-test",
+	}
+
+	req = &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err = b.HandleRequest(req)
+	if resp == nil || !resp.IsError() {
+		t.Fatal("expected error")
+	}
+	if resp.Error().Error() != "missing jwt" {
+		t.Fatalf("unexected error: %s", resp.Error())
+	}
+
+	data = map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  jwtData,
+	}
+
+	req = &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err = b.HandleRequest(req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}

@@ -256,6 +256,9 @@ func (b *kubeAuthBackend) pathLoginRenew(req *logical.Request, data *framework.F
 		return nil, fmt.Errorf("failed to fetch role_name during renewal")
 	}
 
+	b.l.RLock()
+	defer b.l.RUnlock()
+
 	// Ensure that the Role still exists.
 	role, err := b.role(req.Storage, roleName)
 	if err != nil {

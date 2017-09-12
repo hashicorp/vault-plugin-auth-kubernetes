@@ -46,6 +46,9 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 // pathConfigWrite handles create and update commands to the config
 func (b *kubeAuthBackend) pathConfigRead() framework.OperationFunc {
 	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+		b.l.RLock()
+		defer b.l.RUnlock()
+
 		if config, err := b.config(req.Storage); err != nil {
 			return nil, err
 		} else if config == nil {
@@ -93,6 +96,8 @@ func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 			}
 		}
 
+		b.l.Lock()
+		defer b.l.Unlock()
 		entry, err := logical.StorageEntryJSON(configPath, config)
 		if err != nil {
 			return nil, err
