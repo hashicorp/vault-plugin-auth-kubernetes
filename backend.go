@@ -19,6 +19,9 @@ const (
 type kubeAuthBackend struct {
 	*framework.Backend
 
+	// reviewFactory is used to configure the strategy for doing a token review.
+	// Currently the only options are using the kubernetes API or mocking the
+	// review. Mocks should only be used in tests.
 	reviewFactory tokenReviewFactory
 
 	l sync.RWMutex
@@ -54,6 +57,7 @@ func Backend() *kubeAuthBackend {
 		),
 	}
 
+	// Set the review factory to default to calling into the kubernetes API.
 	b.reviewFactory = tokenReviewAPIFactory
 
 	return b
