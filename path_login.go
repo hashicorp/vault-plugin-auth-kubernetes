@@ -253,13 +253,13 @@ func (s *serviceAccount) lookup(jwtStr string, tr tokenReviewer) error {
 	// Verify the returned metadata matches the expected data from the service
 	// account.
 	if s.Name != r.Name {
-		return errors.New("JWT data did not match")
+		return errors.New("JWT names did not match")
 	}
 	if s.UID != r.UID {
-		return errors.New("JWT data did not match")
+		return errors.New("JWT UIDs did not match")
 	}
 	if s.Namespace != r.Namespace {
-		return errors.New("JWT data did not match")
+		return errors.New("JWT namepaces did not match")
 	}
 
 	return nil
