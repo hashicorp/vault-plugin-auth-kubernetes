@@ -1,4 +1,4 @@
-TOOL?=vault-gcp-auth-kubernetes
+TOOL?=vault-plugin-auth-kubernetes
 TEST?=$$(go list ./... | grep -v /vendor/)
 VETARGS?=-asmdecl -atomic -bool -buildtags -copylocks -methods -nilfunc -printf -rangeloops -shift -structtags -unsafeptr
 EXTERNAL_TOOLS=\
@@ -17,7 +17,7 @@ default: dev
 # into ./bin/ as well as $GOPATH/bin, except for quickdev which
 # is only put into /bin/
 quickdev: generate
-	@CGO_ENABLED=0 go build -i -tags='$(BUILD_TAGS)' -o bin/vault-gcp-auth-plugin
+	@CGO_ENABLED=0 go build -i -tags='$(BUILD_TAGS)' -o bin/vault-plugin-auth-kubernetes
 dev: fmtcheck generate
 	@CGO_ENABLED=0 BUILD_TAGS='$(BUILD_TAGS)' VAULT_DEV_BUILD=1 sh -c "'$(CURDIR)/scripts/build.sh'"
 dev-dynamic: generate

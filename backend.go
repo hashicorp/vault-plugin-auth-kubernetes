@@ -15,7 +15,7 @@ const (
 	rolePrefix string = "role/"
 )
 
-// kubeAuthBackend implements logical backend
+// kubeAuthBackend implements logical.Backend
 type kubeAuthBackend struct {
 	*framework.Backend
 

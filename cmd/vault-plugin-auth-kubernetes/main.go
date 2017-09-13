@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
 	"os"
+
+	log "github.com/mgutz/logxi/v1"
 
 	"github.com/hashicorp/vault-plugin-auth-kubernetes"
 	"github.com/hashicorp/vault/helper/pluginutil"
@@ -22,7 +23,7 @@ func main() {
 		TLSProviderFunc:    tlsProviderFunc,
 	})
 	if err != nil {
-		log.Println(err)
+		log.Error("plugin shutting down", "error", err)
 		os.Exit(1)
 	}
 }

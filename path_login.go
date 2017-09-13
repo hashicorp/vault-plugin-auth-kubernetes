@@ -11,6 +11,7 @@ import (
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
 	"github.com/SermoDigital/jose/jwt"
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/vault/helper/strutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -33,11 +34,11 @@ func pathLogin(b *kubeAuthBackend) *framework.Path {
 		Fields: map[string]*framework.FieldSchema{
 			"role": {
 				Type:        framework.TypeString,
-				Description: `Name of the role against which the login is being attempted. Required.`,
+				Description: `Name of the role against which the login is being attempted. This field is required`,
 			},
 			"jwt": {
 				Type:        framework.TypeString,
-				Description: `A signed JWT for authenticating a service account.`,
+				Description: `A signed JWT for authenticating a service account. This field is required.`,
 			},
 		},
 
@@ -71,7 +72,7 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 			return nil, err
 		}
 		if role == nil {
-			return logical.ErrorResponse(fmt.Sprintf("could not load role \"%s\"", roleName)), logical.ErrInvalidRequest
+			return logical.ErrorResponse(fmt.Sprintf("invalid role name \"%s\"", roleName)), logical.ErrInvalidRequest
 		}
 
 		config, err := b.config(req.Storage)
@@ -222,7 +223,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 			// if the error is a failure to verify or a signing method mismatch
 			// continue onto the next cert, storing the error to be returned if
 			// this is the last cert.
-			validationErr = err
+			validationErr = multierror.Append(validationErr, err)
 			continue
 		default:
 			return nil, err

@@ -25,7 +25,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 			},
 			"kubernetes_host": {
 				Type:        framework.TypeString,
-				Description: "Host must be a host string, a host:port pair, or a URL to the base of the apiserver.",
+				Description: "Host must be a host string, a host:port pair, or a URL to the base of the Kubernetes API server.",
 			},
 			"kubernetes_ca_cert": {
 				Type:        framework.TypeString,

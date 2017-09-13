@@ -18,7 +18,7 @@ func TestConfig_Read(t *testing.T) {
 
 	req := &logical.Request{
 		Operation: logical.CreateOperation,
-		Path:      "config",
+		Path:      configPath,
 		Storage:   storage,
 		Data:      data,
 	}
@@ -30,7 +30,7 @@ func TestConfig_Read(t *testing.T) {
 
 	req = &logical.Request{
 		Operation: logical.ReadOperation,
-		Path:      "config",
+		Path:      configPath,
 		Storage:   storage,
 		Data:      nil,
 	}
@@ -53,7 +53,7 @@ func TestConfig(t *testing.T) {
 
 	req := &logical.Request{
 		Operation: logical.CreateOperation,
-		Path:      "config",
+		Path:      configPath,
 		Storage:   storage,
 		Data:      data,
 	}
@@ -73,7 +73,7 @@ func TestConfig(t *testing.T) {
 
 	req = &logical.Request{
 		Operation: logical.CreateOperation,
-		Path:      "config",
+		Path:      configPath,
 		Storage:   storage,
 		Data:      data,
 	}
@@ -94,7 +94,7 @@ func TestConfig(t *testing.T) {
 
 	req = &logical.Request{
 		Operation: logical.CreateOperation,
-		Path:      "config",
+		Path:      configPath,
 		Storage:   storage,
 		Data:      data,
 	}
@@ -116,7 +116,7 @@ func TestConfig(t *testing.T) {
 
 	req = &logical.Request{
 		Operation: logical.CreateOperation,
-		Path:      "config",
+		Path:      configPath,
 		Storage:   storage,
 		Data:      data,
 	}
@@ -156,7 +156,7 @@ func TestConfig(t *testing.T) {
 
 	req = &logical.Request{
 		Operation: logical.CreateOperation,
-		Path:      "config",
+		Path:      configPath,
 		Storage:   storage,
 		Data:      data,
 	}

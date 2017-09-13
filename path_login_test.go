@@ -1,8 +1,10 @@
 package kubeauth
 
 import (
+	"crypto/rsa"
 	"testing"
 
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/vault/logical"
 )
 
@@ -118,7 +120,7 @@ func TestLogin(t *testing.T) {
 	if resp == nil || !resp.IsError() {
 		t.Fatal("expected error")
 	}
-	if resp.Error().Error() != "could not load role \"plugin-test-bad\"" {
+	if resp.Error().Error() != "invalid role name \"plugin-test-bad\"" {
 		t.Fatalf("unexpected error: %s", resp.Error())
 	}
 
@@ -158,7 +160,9 @@ func TestLogin(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if err.Error() != "crypto/rsa: verification error" {
+	var expectedErr error
+	expectedErr = multierror.Append(expectedErr, errMismatchedSigningMethod, rsa.ErrVerification)
+	if err.Error() != expectedErr.Error() {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
