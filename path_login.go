@@ -214,7 +214,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 
 	var validationErr error
 	// for each configured certificate run the verifyFunc
-	for _, cert := range config.Certificates {
+	for _, cert := range config.PublicKeys {
 		serviceAccount, err := verifyFunc(cert)
 		switch err {
 		case nil:

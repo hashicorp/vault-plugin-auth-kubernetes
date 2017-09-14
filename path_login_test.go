@@ -19,7 +19,7 @@ func setupBackend(t *testing.T) (logical.Backend, logical.Storage) {
 
 	// test no certificate
 	data := map[string]interface{}{
-		"certificates":       []string{testECCert, testRSACert},
+		"pem_keys":           []string{testECCert, testRSACert},
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
 	}

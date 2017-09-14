@@ -11,7 +11,7 @@ func TestConfig_Read(t *testing.T) {
 	b, storage := getBackend(t)
 
 	data := map[string]interface{}{
-		"certificates":       []string{testRSACert, testECCert},
+		"pem_keys":           []string{testRSACert, testECCert},
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
 	}
@@ -62,13 +62,13 @@ func TestConfig(t *testing.T) {
 	if resp == nil || !resp.IsError() {
 		t.Fatal("expected error")
 	}
-	if resp.Error().Error() != "no certificate provided" {
+	if resp.Error().Error() != "no PEM provided" {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
 	// test no host
 	data = map[string]interface{}{
-		"certificates": testRSACert,
+		"pem_keys": testRSACert,
 	}
 
 	req = &logical.Request{
@@ -88,7 +88,7 @@ func TestConfig(t *testing.T) {
 
 	// test invalid cert
 	data = map[string]interface{}{
-		"certificates":    "bad",
+		"pem_keys":        "bad",
 		"kubernetes_host": "host",
 	}
 
@@ -109,7 +109,7 @@ func TestConfig(t *testing.T) {
 
 	// Test success
 	data = map[string]interface{}{
-		"certificates":       testRSACert,
+		"pem_keys":           testRSACert,
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
 	}
@@ -132,10 +132,10 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected := &kubeConfig{
-		Certificates:    []interface{}{cert},
-		CertificatePEMs: []string{testRSACert},
-		Host:            "host",
-		CACert:          testCACert,
+		PublicKeys: []interface{}{cert},
+		PEMKeys:    []string{testRSACert},
+		Host:       "host",
+		CACert:     testCACert,
 	}
 
 	conf, err := b.(*kubeAuthBackend).config(storage)
@@ -149,7 +149,7 @@ func TestConfig(t *testing.T) {
 
 	// Test success with two certs
 	data = map[string]interface{}{
-		"certificates":       []string{testRSACert, testECCert},
+		"pem_keys":           []string{testRSACert, testECCert},
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
 	}
@@ -177,10 +177,10 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected = &kubeConfig{
-		Certificates:    []interface{}{cert, cert2},
-		CertificatePEMs: []string{testRSACert, testECCert},
-		Host:            "host",
-		CACert:          testCACert,
+		PublicKeys: []interface{}{cert, cert2},
+		PEMKeys:    []string{testRSACert, testECCert},
+		Host:       "host",
+		CACert:     testCACert,
 	}
 
 	conf, err = b.(*kubeAuthBackend).config(storage)
