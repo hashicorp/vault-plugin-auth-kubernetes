@@ -22,7 +22,23 @@
 
 
 [[constraint]]
+  name = "github.com/SermoDigital/jose"
+  version = "1.1.0"
+
+[[constraint]]
   name = "github.com/fatih/structs"
+  version = "1.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hashicorp/go-multierror"
+
+[[constraint]]
+  name = "github.com/hashicorp/vault"
+  version = "0.8.2"
+
+[[constraint]]
+  name = "github.com/mgutz/logxi"
   version = "1.0.0"
 
 [[constraint]]
@@ -33,3 +49,6 @@
   branch = "release-1.7"
   name = "k8s.io/apimachinery"
 
+[[constraint]]
+  name = "k8s.io/client-go"
+  version = "4.0.0"

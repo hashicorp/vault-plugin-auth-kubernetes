@@ -28,8 +28,8 @@
 [[projects]]
   name = "github.com/asaskevich/govalidator"
   packages = ["."]
-  revision = "4918b99a7cb949bb295f3c7bbaf24b577d806e35"
-  version = "v6"
+  revision = "73945b6115bfbbcc57d89b7316e28109364124e1"
+  version = "v7"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -101,7 +101,7 @@
   branch = "master"
   name = "github.com/go-openapi/spec"
   packages = ["."]
-  revision = "3faa0055dbbf2110abc1f3b4e3adbb22721e96e7"
+  revision = "7abd5745472fff5eb3685386d5fb8bf38683154d"
 
 [[projects]]
   branch = "master"
@@ -191,7 +191,7 @@
   branch = "master"
   name = "github.com/hashicorp/hcl"
   packages = [".","hcl/ast","hcl/parser","hcl/scanner","hcl/strconv","hcl/token","json/parser","json/scanner","json/token"]
-  revision = "8f6b1344a92ff8877cf24a5de9177bf7d0a2a187"
+  revision = "68e816d1c783414e79bc65b3994d9ab6b0a722ab"
 
 [[projects]]
   name = "github.com/hashicorp/vault"
@@ -281,19 +281,19 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "66aacef3dd8a676686c7ae3716979581e8b03c47"
+  revision = "859d1a86bb617c0c20d154590c3c5d3fcb670b07"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
+  revision = "062cd7e4e68206d8bab9b18396626e855c992658"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
-  packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable","width"]
-  revision = "bd91bbf73e9a4a801adbfb97133c992678533126"
+  packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable","width"]
+  revision = "ab5ac5f9a8deb4855a60fab02bc61a4ec770bd49"
 
 [[projects]]
   branch = "master"
@@ -340,6 +340,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "45e8fa833e5b21dda1528a93c3f565abf09179cbb7d0768cb74001b39d77725e"
+  inputs-digest = "558e0c0bc1a12c46e2c3720c07410df7e934c1715b777d3c8eed4deee1b29c78"
   solver-name = "gps-cdcl"
   solver-version = 1
