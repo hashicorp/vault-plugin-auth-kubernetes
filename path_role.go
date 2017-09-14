@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/structs"
 	"github.com/hashicorp/vault/helper/policyutil"
 	"github.com/hashicorp/vault/helper/strutil"
 	"github.com/hashicorp/vault/logical"
@@ -40,7 +39,6 @@ func pathsRole(b *kubeAuthBackend) []*framework.Path {
 				},
 				"policies": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
-					Default:     "default",
 					Description: "List of policies on the role.",
 				},
 				"num_uses": &framework.FieldSchema{
@@ -116,7 +114,7 @@ func (b *kubeAuthBackend) pathRoleRead() framework.OperationFunc {
 		b.l.RLock()
 		defer b.l.RUnlock()
 
-		role, err := b.role(req.Storage, strings.ToLower(roleName))
+		role, err := b.role(req.Storage, roleName)
 		if err != nil {
 			return nil, err
 		}
@@ -130,9 +128,16 @@ func (b *kubeAuthBackend) pathRoleRead() framework.OperationFunc {
 		role.Period /= time.Second
 
 		// Create a map of data to be returned
-		respData := structs.New(role).Map()
 		resp := &logical.Response{
-			Data: respData,
+			Data: map[string]interface{}{
+				"bound_service_account_names":      role.ServiceAccountNames,
+				"bound_service_account_namespaces": role.ServiceAccountNamespaces,
+				"max_ttl":                          role.MaxTTL,
+				"num_uses":                         role.NumUses,
+				"policies":                         role.Policies,
+				"period":                           role.Period,
+				"ttl":                              role.TTL,
+			},
 		}
 
 		return resp, nil
@@ -187,8 +192,6 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate() framework.OperationFunc {
 
 		if policiesRaw, ok := data.GetOk("policies"); ok {
 			role.Policies = policyutil.ParsePolicies(policiesRaw)
-		} else if req.Operation == logical.CreateOperation {
-			role.Policies = policyutil.ParsePolicies(data.Get("policies"))
 		}
 
 		periodRaw, ok := data.GetOk("period")
@@ -232,7 +235,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate() framework.OperationFunc {
 		var resp *logical.Response
 		if role.MaxTTL > b.System().MaxLeaseTTL() {
 			resp = &logical.Response{}
-			resp.AddWarning("max_ttl is greater than the backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
+			resp.AddWarning("max_ttl is greater than the system or backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
 		}
 
 		if serviceAccountUUIDs, ok := data.GetOk("bound_service_account_names"); ok {

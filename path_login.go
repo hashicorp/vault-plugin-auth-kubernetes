@@ -88,6 +88,12 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 			return nil, err
 		}
 
+		// look up the JWT token in the kubernetes API
+		err = serviceAccount.lookup(jwtStr, b.reviewFactory(config))
+		if err != nil {
+			return nil, err
+		}
+
 		resp := &logical.Response{
 			Auth: &logical.Auth{
 				NumUses: role.NumUses,
@@ -197,10 +203,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 					}
 				}
 
-				tr := b.reviewFactory(config)
-
-				// look up the JWT token in the kubernetes API
-				return serviceAccount.lookup(jwtStr, tr)
+				return nil
 			},
 		}
 
