@@ -35,7 +35,7 @@
 
 [[constraint]]
   name = "github.com/hashicorp/vault"
-  version = "0.8.2"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/mgutz/logxi"

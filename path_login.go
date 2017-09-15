@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/SermoDigital/jose/crypto"
@@ -21,6 +20,8 @@ import (
 var (
 	// expectedJWTIssuer is used to verify the iss header on the JWT.
 	expectedJWTIssuer string = "kubernetes/serviceaccount"
+
+	uidJWTClaimKey string = "kubernetes.io/serviceaccount/service-account.uid"
 
 	// errMismatchedSigningMethod is used if the certificate doesn't match the
 	// JWT's expected signing method.
@@ -43,7 +44,8 @@ func pathLogin(b *kubeAuthBackend) *framework.Path {
 		},
 
 		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.UpdateOperation: b.pathLogin(),
+			logical.UpdateOperation:           b.pathLogin(),
+			logical.PersonaLookaheadOperation: b.personaLookahead(),
 		},
 
 		HelpSynopsis:    pathLoginHelpSyn,
@@ -67,7 +69,7 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 		b.l.RLock()
 		defer b.l.RUnlock()
 
-		role, err := b.role(req.Storage, strings.ToLower(roleName))
+		role, err := b.role(req.Storage, roleName)
 		if err != nil {
 			return nil, err
 		}
@@ -129,6 +131,36 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 		}
 
 		return resp, nil
+	}
+}
+
+// personaLookahead returns the persona object with the SA UID from the JWT
+// Claims.
+func (b *kubeAuthBackend) personaLookahead() framework.OperationFunc {
+	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+		jwtStr := data.Get("jwt").(string)
+		if len(jwtStr) == 0 {
+			return logical.ErrorResponse("missing jwt"), nil
+		}
+
+		// Parse into JWT
+		parsedJWT, err := jws.ParseJWT([]byte(jwtStr))
+		if err != nil {
+			return nil, err
+		}
+
+		saUID, ok := parsedJWT.Claims().Get(uidJWTClaimKey).(string)
+		if !ok || saUID == "" {
+			return nil, errors.New("could not parse UID from claims")
+		}
+
+		return &logical.Response{
+			Auth: &logical.Auth{
+				Persona: &logical.Persona{
+					Name: saUID,
+				},
+			},
+		}, nil
 	}
 }
 

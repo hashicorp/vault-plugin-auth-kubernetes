@@ -45,7 +45,7 @@ func TestPath_Create(t *testing.T) {
 	}
 
 	expected := &roleStorageEntry{
-		Policies:                 []string{"default", "test"},
+		Policies:                 []string{"test"},
 		Period:                   3 * time.Second,
 		ServiceAccountNames:      []string{"name"},
 		ServiceAccountNamespaces: []string{"namespace"},
@@ -197,7 +197,7 @@ func TestPath_Read(t *testing.T) {
 	expected := map[string]interface{}{
 		"bound_service_account_names":      []string{"name"},
 		"bound_service_account_namespaces": []string{"namespace"},
-		"policies":                         []string{"default", "test"},
+		"policies":                         []string{"test"},
 		"period":                           time.Duration(3),
 		"ttl":                              time.Duration(1),
 		"num_uses":                         12,
