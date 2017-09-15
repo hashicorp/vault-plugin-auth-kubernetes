@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	authv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 	"k8s.io/client-go/rest"
 )
@@ -37,30 +39,53 @@ func tokenReviewAPIFactory(config *kubeConfig) tokenReviewer {
 }
 
 func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
+	scheme := runtime.NewScheme()
+	authv1.AddToScheme(scheme)
+	codecs := serializer.NewCodecFactory(scheme)
+
 	clientConfig := &rest.Config{
 		BearerToken: jwt,
 		Host:        t.config.Host,
 		TLSClientConfig: rest.TLSClientConfig{
-			CAData: []byte(t.config.CACert),
+			CAData:   []byte(t.config.CACert),
+			Insecure: true,
+		},
+		ContentConfig: rest.ContentConfig{
+			GroupVersion: &schema.GroupVersion{
+				Version: "v1",
+			},
+			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: codecs},
 		},
 	}
-	clientset, err := kubernetes.NewForConfig(clientConfig)
+
+	restClient, err := rest.RESTClientFor(clientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	r, err := clientset.AuthenticationV1().TokenReviews().Create(&authv1.TokenReview{
+	req := restClient.Post()
+	req.RequestURI("/apis/authentication.k8s.io/v1/tokenreviews")
+	req.Body(&authv1.TokenReview{
 		Spec: authv1.TokenReviewSpec{
 			Token: jwt,
 		},
 	})
+	resp := req.Do()
+	err = resp.Error()
 	switch {
 	case kubeerrors.IsUnauthorized(err):
 		// If the err is unauthorized that means the token has since been deleted
 		return nil, errors.New("lookup failed: service account deleted")
 	case err != nil:
 		return nil, err
-	case r == nil:
+	}
+	raw, err := resp.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	r, ok := raw.(*authv1.TokenReview)
+	if !ok || r == nil {
 		return nil, errors.New("lookup failed: no status returned")
 	}
 
