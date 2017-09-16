@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 
@@ -114,13 +113,10 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 }
 
 func parseResponse(resp *http.Response) (*authv1.TokenReview, error) {
-	log.Println(resp)
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	log.Println(string(body))
 	defer resp.Body.Close()
 
 	// If the request was not a success create a kuberenets error
