@@ -76,7 +76,7 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer ii%s", jwt))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
 
 	resp, err := client.Do(req)
 	if err != nil {
