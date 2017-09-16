@@ -133,14 +133,14 @@ func parseResponse(resp *http.Response) (*authv1.TokenReview, error) {
 
 	// If we can succesfully Unmarshal into a status object that means there is
 	// an error to return
-	var errStatus *metav1.Status
+	errStatus := &metav1.Status{}
 	err = json.Unmarshal(body, errStatus)
 	if err == nil && errStatus.Status != metav1.StatusSuccess {
 		return nil, kubeerrors.FromObject(runtime.Object(errStatus))
 	}
 
 	// Unmarshal the resp body into a TokenReview Object
-	var trResp *authv1.TokenReview
+	trResp := &authv1.TokenReview{}
 	err = json.Unmarshal(body, trResp)
 	if err != nil {
 		return nil, err
