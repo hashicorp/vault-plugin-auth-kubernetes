@@ -48,6 +48,7 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 
 	client := cleanhttp.DefaultClient()
 
+	// If we have a CA cert build the TLSConfig
 	if len(t.config.CACert) > 0 {
 		certPool := x509.NewCertPool()
 		certPool.AppendCertsFromPEM([]byte(t.config.CACert))
@@ -60,6 +61,7 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 		client.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}
 
+	// Create the TokenReview Object and marshal it into json
 	trReq := &authv1.TokenReview{
 		Spec: authv1.TokenReviewSpec{
 			Token: jwt,
@@ -70,11 +72,13 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 		return nil, err
 	}
 
+	// Build the request to the token review API
 	url := fmt.Sprintf("%s/apis/authentication.k8s.io/v1/tokenreviews", t.config.Host)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(trJson))
 	if err != nil {
 		return nil, err
 	}
+	// Set the JWT as the Bearer token
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
 
 	resp, err := client.Do(req)
@@ -82,6 +86,7 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 		return nil, err
 	}
 
+	// Parse the resp into a tokenreview object or a kubernetes error type
 	r, err := parseResponse(resp)
 	switch {
 	case kubeerrors.IsUnauthorized(err):
@@ -112,6 +117,8 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 	}, nil
 }
 
+// parseResponse takes the API response and either returns the appropriate error
+// or the TokenReview Object.
 func parseResponse(resp *http.Response) (*authv1.TokenReview, error) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -132,6 +139,7 @@ func parseResponse(resp *http.Response) (*authv1.TokenReview, error) {
 		return nil, kubeerrors.FromObject(runtime.Object(errStatus))
 	}
 
+	// Unmarshal the resp body into a TokenReview Object
 	var trResp *authv1.TokenReview
 	err = json.Unmarshal(body, trResp)
 	if err != nil {
