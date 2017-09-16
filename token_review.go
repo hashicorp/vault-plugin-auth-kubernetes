@@ -1,16 +1,22 @@
 package kubeauth
 
 import (
+	"bytes"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 
+	cleanhttp "github.com/hashicorp/go-cleanhttp"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	authv1 "k8s.io/client-go/pkg/apis/authentication/v1"
-	"k8s.io/client-go/rest"
 )
 
 // This is the result from the token review
@@ -39,54 +45,55 @@ func tokenReviewAPIFactory(config *kubeConfig) tokenReviewer {
 }
 
 func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
-	scheme := runtime.NewScheme()
-	authv1.AddToScheme(scheme)
-	codecs := serializer.NewCodecFactory(scheme)
 
-	clientConfig := &rest.Config{
-		BearerToken: jwt,
-		Host:        t.config.Host,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData:   []byte(t.config.CACert),
-			Insecure: true,
-		},
-		ContentConfig: rest.ContentConfig{
-			GroupVersion: &schema.GroupVersion{
-				Version: "v1",
-			},
-			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: codecs},
-		},
+	client := cleanhttp.DefaultClient()
+
+	// If we have a CA cert build the TLSConfig
+	if len(t.config.CACert) > 0 {
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM([]byte(t.config.CACert))
+
+		tlsConfig := &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			RootCAs:    certPool,
+		}
+
+		client.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}
 
-	restClient, err := rest.RESTClientFor(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	req := restClient.Post()
-	req.RequestURI("/apis/authentication.k8s.io/v1/tokenreviews")
-	req.Body(&authv1.TokenReview{
+	// Create the TokenReview Object and marshal it into json
+	trReq := &authv1.TokenReview{
 		Spec: authv1.TokenReviewSpec{
 			Token: jwt,
 		},
-	})
-	resp := req.Do()
-	err = resp.Error()
-	switch {
-	case kubeerrors.IsUnauthorized(err):
-		// If the err is unauthorized that means the token has since been deleted
-		return nil, errors.New("lookup failed: service account deleted")
-	case err != nil:
-		return nil, err
 	}
-	raw, err := resp.Get()
+	trJson, err := json.Marshal(trReq)
 	if err != nil {
 		return nil, err
 	}
 
-	r, ok := raw.(*authv1.TokenReview)
-	if !ok || r == nil {
-		return nil, errors.New("lookup failed: no status returned")
+	// Build the request to the token review API
+	url := fmt.Sprintf("%s/apis/authentication.k8s.io/v1/tokenreviews", t.config.Host)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(trJson))
+	if err != nil {
+		return nil, err
+	}
+	// Set the JWT as the Bearer token
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the resp into a tokenreview object or a kubernetes error type
+	r, err := parseResponse(resp)
+	switch {
+	case kubeerrors.IsUnauthorized(err):
+		// If the err is unauthorized that means the token has since been deleted
+		return nil, errors.New("lookup failed: service account unauthorized; this could mean it has been deleted")
+	case err != nil:
+		return nil, err
 	}
 
 	if r.Status.Error != "" {
@@ -108,6 +115,38 @@ func (t *tokenReviewAPI) Review(jwt string) (*tokenReviewResult, error) {
 		Namespace: parts[2],
 		UID:       string(r.Status.User.UID),
 	}, nil
+}
+
+// parseResponse takes the API response and either returns the appropriate error
+// or the TokenReview Object.
+func parseResponse(resp *http.Response) (*authv1.TokenReview, error) {
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// If the request was not a success create a kuberenets error
+	if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
+		return nil, kubeerrors.NewGenericServerResponse(resp.StatusCode, "POST", schema.GroupResource{}, "", strings.TrimSpace(string(body)), 0, true)
+	}
+
+	// If we can succesfully Unmarshal into a status object that means there is
+	// an error to return
+	errStatus := &metav1.Status{}
+	err = json.Unmarshal(body, errStatus)
+	if err == nil && errStatus.Status != metav1.StatusSuccess {
+		return nil, kubeerrors.FromObject(runtime.Object(errStatus))
+	}
+
+	// Unmarshal the resp body into a TokenReview Object
+	trResp := &authv1.TokenReview{}
+	err = json.Unmarshal(body, trResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return trResp, nil
 }
 
 // mock review is used while testing
