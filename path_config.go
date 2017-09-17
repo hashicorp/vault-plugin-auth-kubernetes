@@ -22,9 +22,9 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 			"pem_keys": {
 				Type: framework.TypeCommaStringSlice,
 				Description: `List of PEM-formated public keys or certificates
-				used to verify the signatures of kubernetes service account
-				JWTs. If a certificate is given, its public key will be
-				extracted.`,
+used to verify the signatures of kubernetes service account
+JWTs. If a certificate is given, its public key will be
+extracted.`,
 			},
 			"kubernetes_host": {
 				Type:        framework.TypeString,

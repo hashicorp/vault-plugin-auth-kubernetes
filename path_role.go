@@ -30,12 +30,14 @@ func pathsRole(b *kubeAuthBackend) []*framework.Path {
 					Description: "Name of the role.",
 				},
 				"bound_service_account_names": &framework.FieldSchema{
-					Type:        framework.TypeCommaStringSlice,
-					Description: `List of service account names able to access this role.`,
+					Type: framework.TypeCommaStringSlice,
+					Description: `List of service account names able to access this role. If set to "*" all names
+are allowed, both this and bound_service_account_namespaces can not be "*"`,
 				},
 				"bound_service_account_namespaces": &framework.FieldSchema{
-					Type:        framework.TypeCommaStringSlice,
-					Description: "List of namespaces allowed to access this role. If not set defaults to all namespaces.",
+					Type: framework.TypeCommaStringSlice,
+					Description: `List of namespaces allowed to access this role. If set to "*" all namespaces
+are allowed, both this and bound_service_account_names can not be set to "*"`,
 				},
 				"policies": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
