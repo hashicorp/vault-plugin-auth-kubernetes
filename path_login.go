@@ -206,9 +206,14 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 		return nil, err
 	}
 
+	// If we don't have any public keys to verify, return the sa and end early.
+	if len(config.PublicKeys) == 0 {
+		return sa, nil
+	}
+
 	// verifyFunc is called for each certificate that is configured in the
 	// backend until one of the certificates succeeds.
-	verifyFunc := func(cert interface{}) (*serviceAccount, error) {
+	verifyFunc := func(cert interface{}) error {
 		// Parse Headers and verify the signing method matches the public key type
 		// configured. This is done in its own scope since we don't need most of
 		// these variables later.
@@ -216,7 +221,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 		{
 			parsedJWS, err := jws.Parse([]byte(jwtStr))
 			if err != nil {
-				return nil, err
+				return err
 			}
 			headers := parsedJWS.Protected()
 
@@ -224,39 +229,39 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 			if headers.Has("alg") {
 				algStr = headers.Get("alg").(string)
 			} else {
-				return nil, errors.New("provided JWT must have 'alg' header value")
+				return errors.New("provided JWT must have 'alg' header value")
 			}
 
 			signingMethod = jws.GetSigningMethod(algStr)
 			switch signingMethod.(type) {
 			case *crypto.SigningMethodECDSA:
 				if _, ok := cert.(*ecdsa.PublicKey); !ok {
-					return nil, errMismatchedSigningMethod
+					return errMismatchedSigningMethod
 				}
 			case *crypto.SigningMethodRSA:
 				if _, ok := cert.(*rsa.PublicKey); !ok {
-					return nil, errMismatchedSigningMethod
+					return errMismatchedSigningMethod
 				}
 			default:
-				return nil, errors.New("unsupported JWT signing method")
+				return errors.New("unsupported JWT signing method")
 			}
 		}
 
 		// validates the signature and then runs the claim validation
 		if err := parsedJWT.Validate(cert, signingMethod); err != nil {
-			return nil, err
+			return err
 		}
 
-		return sa, nil
+		return nil
 	}
 
 	var validationErr error
 	// for each configured certificate run the verifyFunc
 	for _, cert := range config.PublicKeys {
-		serviceAccount, err := verifyFunc(cert)
+		err := verifyFunc(cert)
 		switch err {
 		case nil:
-			return serviceAccount, nil
+			return sa, nil
 		case rsa.ErrVerification, crypto.ErrECDSAVerification, errMismatchedSigningMethod:
 			// if the error is a failure to verify or a signing method mismatch
 			// continue onto the next cert, storing the error to be returned if
