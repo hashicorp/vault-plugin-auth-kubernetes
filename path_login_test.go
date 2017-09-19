@@ -14,12 +14,17 @@ var (
 	testUID       string = "d77f89bc-9055-11e7-a068-0800276d99bf"
 )
 
-func setupBackend(t *testing.T) (logical.Backend, logical.Storage) {
+func setupBackend(t *testing.T, noPEMs bool) (logical.Backend, logical.Storage) {
 	b, storage := getBackend(t)
+
+	pems := []string{testECCert, testRSACert}
+	if noPEMs {
+		pems = []string{}
+	}
 
 	// test no certificate
 	data := map[string]interface{}{
-		"pem_keys":           []string{testECCert, testRSACert},
+		"pem_keys":           pems,
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
 	}
@@ -62,7 +67,7 @@ func setupBackend(t *testing.T) (logical.Backend, logical.Storage) {
 }
 
 func TestLogin(t *testing.T) {
-	b, storage := setupBackend(t)
+	b, storage := setupBackend(t, false)
 	b.(*kubeAuthBackend).reviewFactory = mockTokenReviewFactory(testName, testNamespace, testUID)
 
 	// Test bad inputs
@@ -185,8 +190,51 @@ func TestLogin(t *testing.T) {
 	}
 }
 
+func TestLogin_NoPEMs(t *testing.T) {
+	b, storage := setupBackend(t, true)
+	b.(*kubeAuthBackend).reviewFactory = mockTokenReviewFactory(testName, testNamespace, testUID)
+
+	// test bad jwt service account
+	data := map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  jwtBadServiceAccount,
+	}
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err := b.HandleRequest(req)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "service account name not authorized" {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	// test successful login
+	data = map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  jwtData,
+	}
+
+	req = &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err = b.HandleRequest(req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+}
+
 func TestPersonaLookAhead(t *testing.T) {
-	b, storage := setupBackend(t)
+	b, storage := setupBackend(t, false)
 
 	// Test bad inputs
 	data := map[string]interface{}{
