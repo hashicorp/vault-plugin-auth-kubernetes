@@ -166,6 +166,45 @@ func (b *kubeAuthBackend) personaLookahead() framework.OperationFunc {
 
 // parseAndValidateJWT is used to parse, validate and lookup the JWT token.
 func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+	// Parse into JWT
+	parsedJWT, err := jws.ParseJWT([]byte(jwtStr))
+	if err != nil {
+		return nil, err
+	}
+
+	sa := &serviceAccount{}
+	validator := &jwt.Validator{
+		Expected: jwt.Claims{
+			"iss": expectedJWTIssuer,
+		},
+		Fn: func(c jwt.Claims) error {
+			// Decode claims into a service account object
+			err := mapstructure.Decode(c, sa)
+			if err != nil {
+				return err
+			}
+
+			// verify the namespace is allowed
+			if len(role.ServiceAccountNamespaces) > 1 || role.ServiceAccountNamespaces[0] != "*" {
+				if !strutil.StrListContains(role.ServiceAccountNamespaces, sa.Namespace) {
+					return errors.New("namespace not authorized")
+				}
+			}
+
+			// verify the service account name is allowed
+			if len(role.ServiceAccountNames) > 1 || role.ServiceAccountNames[0] != "*" {
+				if !strutil.StrListContains(role.ServiceAccountNames, sa.Name) {
+					return errors.New("service account name not authorized")
+				}
+			}
+
+			return nil
+		},
+	}
+
+	if err := validator.Validate(parsedJWT); err != nil {
+		return nil, err
+	}
 
 	// verifyFunc is called for each certificate that is configured in the
 	// backend until one of the certificates succeeds.
@@ -203,48 +242,12 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 			}
 		}
 
-		// Parse into JWT
-		parsedJWT, err := jws.ParseJWT([]byte(jwtStr))
-		if err != nil {
-			return nil, err
-		}
-
-		serviceAccount := &serviceAccount{}
-		validator := &jwt.Validator{
-			Expected: jwt.Claims{
-				"iss": expectedJWTIssuer,
-			},
-			Fn: func(c jwt.Claims) error {
-				// Decode claims into a service account object
-				err := mapstructure.Decode(c, serviceAccount)
-				if err != nil {
-					return err
-				}
-
-				// verify the namespace is allowed
-				if len(role.ServiceAccountNamespaces) > 1 || role.ServiceAccountNamespaces[0] != "*" {
-					if !strutil.StrListContains(role.ServiceAccountNamespaces, serviceAccount.Namespace) {
-						return errors.New("namespace not authorized")
-					}
-				}
-
-				// verify the service account name is allowed
-				if len(role.ServiceAccountNames) > 1 || role.ServiceAccountNames[0] != "*" {
-					if !strutil.StrListContains(role.ServiceAccountNames, serviceAccount.Name) {
-						return errors.New("service account name not authorized")
-					}
-				}
-
-				return nil
-			},
-		}
-
 		// validates the signature and then runs the claim validation
-		if err := parsedJWT.Validate(cert, signingMethod, validator); err != nil {
+		if err := parsedJWT.Validate(cert, signingMethod); err != nil {
 			return nil, err
 		}
 
-		return serviceAccount, nil
+		return sa, nil
 	}
 
 	var validationErr error

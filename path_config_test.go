@@ -48,8 +48,10 @@ func TestConfig_Read(t *testing.T) {
 func TestConfig(t *testing.T) {
 	b, storage := getBackend(t)
 
-	// test no certificate
-	data := map[string]interface{}{}
+	// test no host
+	data := map[string]interface{}{
+		"pem_keys": testRSACert,
+	}
 
 	req := &logical.Request{
 		Operation: logical.CreateOperation,
@@ -59,26 +61,6 @@ func TestConfig(t *testing.T) {
 	}
 
 	resp, err := b.HandleRequest(req)
-	if resp == nil || !resp.IsError() {
-		t.Fatal("expected error")
-	}
-	if resp.Error().Error() != "no PEM provided" {
-		t.Fatalf("got unexpected error: %v", resp.Error())
-	}
-
-	// test no host
-	data = map[string]interface{}{
-		"pem_keys": testRSACert,
-	}
-
-	req = &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      configPath,
-		Storage:   storage,
-		Data:      data,
-	}
-
-	resp, err = b.HandleRequest(req)
 	if resp == nil || !resp.IsError() {
 		t.Fatal("expected error")
 	}

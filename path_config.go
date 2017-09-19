@@ -71,16 +71,12 @@ func (b *kubeAuthBackend) pathConfigRead() framework.OperationFunc {
 // pathConfigWrite handles create and update commands to the config
 func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 	return func(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-		pemList := data.Get("pem_keys").([]string)
-		if len(pemList) == 0 {
-			return logical.ErrorResponse("no PEM provided"), nil
-		}
-
 		host := data.Get("kubernetes_host").(string)
 		if host == "" {
 			return logical.ErrorResponse("no host provided"), nil
 		}
 
+		pemList := data.Get("pem_keys").([]string)
 		config := &kubeConfig{
 			PublicKeys: make([]interface{}, len(pemList)),
 			PEMKeys:    pemList,
