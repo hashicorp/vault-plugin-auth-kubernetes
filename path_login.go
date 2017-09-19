@@ -74,7 +74,7 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 			return nil, err
 		}
 		if role == nil {
-			return logical.ErrorResponse(fmt.Sprintf("invalid role name \"%s\"", roleName)), logical.ErrInvalidRequest
+			return logical.ErrorResponse(fmt.Sprintf("invalid role name \"%s\"", roleName)), nil
 		}
 
 		config, err := b.config(req.Storage)
