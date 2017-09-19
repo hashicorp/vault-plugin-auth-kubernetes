@@ -77,11 +77,16 @@ func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 		}
 
 		pemList := data.Get("pem_keys").([]string)
+		caCert := data.Get("kubernetes_ca_cert").(string)
+		if len(pemList) == 0 && len(caCert) == 0 {
+			return logical.ErrorResponse("one of pem_keys or kubernetes_ca_cert must be set"), nil
+		}
+
 		config := &kubeConfig{
 			PublicKeys: make([]interface{}, len(pemList)),
 			PEMKeys:    pemList,
 			Host:       host,
-			CACert:     data.Get("kubernetes_ca_cert").(string),
+			CACert:     caCert,
 		}
 
 		var err error
