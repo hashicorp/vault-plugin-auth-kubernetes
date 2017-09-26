@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 
+	"github.com/SermoDigital/jose/jws"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
@@ -19,13 +20,6 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 	return &framework.Path{
 		Pattern: "config$",
 		Fields: map[string]*framework.FieldSchema{
-			"pem_keys": {
-				Type: framework.TypeCommaStringSlice,
-				Description: `List of PEM-formated public keys or certificates
-used to verify the signatures of kubernetes service account
-JWTs. If a certificate is given, its public key will be
-extracted.`,
-			},
 			"kubernetes_host": {
 				Type:        framework.TypeString,
 				Description: "Host must be a host string, a host:port pair, or a URL to the base of the Kubernetes API server.",
@@ -33,6 +27,17 @@ extracted.`,
 			"kubernetes_ca_cert": {
 				Type:        framework.TypeString,
 				Description: "PEM encoded CA cert for use by the TLS client used to talk with the API.",
+			},
+			"token_reviewer_jwt": {
+				Type:        framework.TypeString,
+				Description: "A service account JWT used to access the TokenReview API to validate other JWTs during login.",
+			},
+			"pem_keys": {
+				Type: framework.TypeCommaStringSlice,
+				Description: `Optional list of PEM-formated public keys or certificates
+used to verify the signatures of kubernetes service account
+JWTs. If a certificate is given, its public key will be
+extracted. Not every installation of Kuberentes exposes these keys.`,
 			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
@@ -82,11 +87,21 @@ func (b *kubeAuthBackend) pathConfigWrite() framework.OperationFunc {
 			return logical.ErrorResponse("one of pem_keys or kubernetes_ca_cert must be set"), nil
 		}
 
+		tokenReviewer := data.Get("token_reviewer_jwt").(string)
+		if len(tokenReviewer) > 0 {
+			// Validate it's a JWT
+			_, err := jws.ParseJWT([]byte(tokenReviewer))
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		config := &kubeConfig{
-			PublicKeys: make([]interface{}, len(pemList)),
-			PEMKeys:    pemList,
-			Host:       host,
-			CACert:     caCert,
+			PublicKeys:       make([]interface{}, len(pemList)),
+			PEMKeys:          pemList,
+			Host:             host,
+			CACert:           caCert,
+			TokenReviewerJWT: tokenReviewer,
 		}
 
 		var err error
@@ -121,6 +136,8 @@ type kubeConfig struct {
 	Host string `json:"host"`
 	// CACert is the CA Cert to use to call into the kubernetes API
 	CACert string `json:"ca_cert"`
+	// TokenReviewJWT is the bearer to use during the TokenReview API call
+	TokenReviewerJWT string `json:"token_reviewer_jwt"`
 }
 
 // PasrsePublicKeyPEM is used to parse RSA and ECDSA public keys from PEMs
