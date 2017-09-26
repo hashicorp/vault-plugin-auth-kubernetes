@@ -62,9 +62,10 @@ func (b *kubeAuthBackend) pathConfigRead() framework.OperationFunc {
 			// Create a map of data to be returned
 			resp := &logical.Response{
 				Data: map[string]interface{}{
-					"pem_keys":           config.PEMKeys,
 					"kubernetes_host":    config.Host,
 					"kubernetes_ca_cert": config.CACert,
+					"token_reviewer_jwt": config.TokenReviewerJWT,
+					"pem_keys":           config.PEMKeys,
 				},
 			}
 
