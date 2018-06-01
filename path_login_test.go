@@ -53,10 +53,11 @@ func setupBackend(t *testing.T, noPEMs bool) (logical.Backend, logical.Storage) 
 	}
 
 	req = &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      "role/plugin-test",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.CreateOperation,
+		Path:       "role/plugin-test",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err = b.HandleRequest(context.Background(), req)
@@ -77,10 +78,11 @@ func TestLogin(t *testing.T) {
 	}
 
 	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -96,10 +98,11 @@ func TestLogin(t *testing.T) {
 	}
 
 	req = &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err = b.HandleRequest(context.Background(), req)
@@ -116,10 +119,11 @@ func TestLogin(t *testing.T) {
 		"jwt":  jwtData,
 	}
 	req = &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err = b.HandleRequest(context.Background(), req)
@@ -136,10 +140,11 @@ func TestLogin(t *testing.T) {
 		"jwt":  jwtBadServiceAccount,
 	}
 	req = &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err = b.HandleRequest(context.Background(), req)
@@ -156,10 +161,11 @@ func TestLogin(t *testing.T) {
 		"jwt":  jwtWithBadSigningKey,
 	}
 	req = &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err = b.HandleRequest(context.Background(), req)
@@ -179,10 +185,11 @@ func TestLogin(t *testing.T) {
 	}
 
 	req = &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err = b.HandleRequest(context.Background(), req)
@@ -201,10 +208,11 @@ func TestLogin_NoPEMs(t *testing.T) {
 		"jwt":  jwtBadServiceAccount,
 	}
 	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -222,10 +230,11 @@ func TestLogin_NoPEMs(t *testing.T) {
 	}
 
 	req = &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err = b.HandleRequest(context.Background(), req)
@@ -243,10 +252,11 @@ func TestAliasLookAhead(t *testing.T) {
 	}
 
 	req := &logical.Request{
-		Operation: logical.AliasLookaheadOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
+		Operation:  logical.AliasLookaheadOperation,
+		Path:       "login",
+		Storage:    storage,
+		Data:       data,
+		Connection: &logical.Connection{},
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)

@@ -11,6 +11,7 @@ import (
 	"github.com/SermoDigital/jose/jws"
 	"github.com/SermoDigital/jose/jwt"
 	multierror "github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/vault/helper/cidrutil"
 	"github.com/hashicorp/vault/helper/strutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -77,6 +78,11 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 			return logical.ErrorResponse(fmt.Sprintf("invalid role name \"%s\"", roleName)), nil
 		}
 
+		// Check for a CIDR match.
+		if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.BoundCIDRs) {
+			return nil, errors.New("renewal request originated from invalid CIDR")
+		}
+
 		config, err := b.config(ctx, req.Storage)
 		if err != nil {
 			return nil, err
@@ -120,6 +126,7 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 					TTL:       role.TTL,
 					MaxTTL:    role.MaxTTL,
 				},
+				BoundCIDRs: role.BoundCIDRs,
 			},
 		}
 
@@ -321,10 +328,16 @@ func (b *kubeAuthBackend) pathLoginRenew() framework.OperationFunc {
 			return nil, fmt.Errorf("role %s does not exist during renewal", roleName)
 		}
 
+		// Check for a CIDR match.
+		if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.BoundCIDRs) {
+			return nil, errors.New("renewal request originated from invalid CIDR")
+		}
+
 		resp := &logical.Response{Auth: req.Auth}
 		resp.Auth.TTL = role.TTL
 		resp.Auth.MaxTTL = role.MaxTTL
 		resp.Auth.Period = role.Period
+		resp.Auth.BoundCIDRs = role.BoundCIDRs
 		return resp, nil
 	}
 }
