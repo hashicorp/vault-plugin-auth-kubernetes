@@ -79,8 +79,8 @@ func (b *kubeAuthBackend) pathLogin() framework.OperationFunc {
 		}
 
 		// Check for a CIDR match.
-		if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.BoundCIDRs) {
-			return nil, errors.New("renewal request originated from invalid CIDR")
+		if req.Connection != nil && !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.BoundCIDRs) {
+			return logical.ErrorResponse("request originated from invalid CIDR"), nil
 		}
 
 		config, err := b.config(ctx, req.Storage)
