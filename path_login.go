@@ -328,16 +328,10 @@ func (b *kubeAuthBackend) pathLoginRenew() framework.OperationFunc {
 			return nil, fmt.Errorf("role %s does not exist during renewal", roleName)
 		}
 
-		// Check for a CIDR match.
-		if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.BoundCIDRs) {
-			return nil, errors.New("renewal request originated from invalid CIDR")
-		}
-
 		resp := &logical.Response{Auth: req.Auth}
 		resp.Auth.TTL = role.TTL
 		resp.Auth.MaxTTL = role.MaxTTL
 		resp.Auth.Period = role.Period
-		resp.Auth.BoundCIDRs = role.BoundCIDRs
 		return resp, nil
 	}
 }
