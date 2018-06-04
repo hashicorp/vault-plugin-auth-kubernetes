@@ -194,7 +194,6 @@
   revision = "ef8a98b0bbce4a65b5aa4c368430a80ddc533168"
 
 [[projects]]
-  branch = "master"
   name = "github.com/hashicorp/vault"
   packages = [
     "api",
@@ -222,7 +221,8 @@
     "physical/inmem",
     "version"
   ]
-  revision = "da2bb1c8a7b2ac56a3448eb460fe4b558f1da116"
+  revision = "32831d6f009451274e8325381d7b2e64aab7fcbe"
+  source = "github.com/krish7919/vault"
 
 [[projects]]
   branch = "master"
@@ -418,6 +418,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "39d822e147bf9ecb75a1f555283d058805001e89f606b736a08c4c1040cae677"
+  inputs-digest = "dc83404717963960dbec8d25f4ba76774c338bb4cb7bee7c9121f4c6f2cfdcd7"
   solver-name = "gps-cdcl"
   solver-version = 1
