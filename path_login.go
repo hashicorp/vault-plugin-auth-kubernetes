@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	log "github.com/hashicorp/go-hclog"
 
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
@@ -191,9 +192,10 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 				}
 			}
 
+			log.Default().Info(fmt.Sprintf("using wildcard to match service account"))
 			// verify the service account name is allowed
 			if len(role.ServiceAccountNames) > 1 || role.ServiceAccountNames[0] != "*" {
-				if !strutil.StrListContains(role.ServiceAccountNames, sa.Name) {
+				if !strutil.StrListContainsWildcard(role.ServiceAccountNames, sa.Name) {
 					return errors.New("service account name not authorized")
 				}
 			}
