@@ -30,14 +30,6 @@
   name = "github.com/SermoDigital/jose"
 
 [[constraint]]
-  name = "github.com/briankassouf/jose"
-  version = "1.1.0"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/hashicorp/errwrap"
-
-[[constraint]]
   branch = "master"
   name = "github.com/hashicorp/go-cleanhttp"
 
@@ -72,3 +64,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "github.com/briankassouf/jose"
+  branch = "master"
