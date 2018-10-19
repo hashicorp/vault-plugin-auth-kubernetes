@@ -280,16 +280,22 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 // serviceAccount holds the metadata from the JWT token and is used to lookup
 // the JWT in the kubernetes API and compare the results.
 type serviceAccount struct {
-	Name       string            `mapstructure:"kubernetes.io/serviceaccount/service-account.name"`
-	UID        string            `mapstructure:"kubernetes.io/serviceaccount/service-account.uid"`
-	SecretName string            `mapstructure:"kubernetes.io/serviceaccount/secret.name"`
-	Namespace  string            `mapstructure:"kubernetes.io/serviceaccount/namespace"`
-	Aud        []string          `mapstructure:"aud"`
-	Kubernetes *kubeServiceToken `mapstructure:"kubernetes.io"`
-	Expiration int64             `mapstructure:"exp"`
-	IssuedAt   int64             `mapstructure:"iat"`
+	Name       string   `mapstructure:"kubernetes.io/serviceaccount/service-account.name"`
+	UID        string   `mapstructure:"kubernetes.io/serviceaccount/service-account.uid"`
+	SecretName string   `mapstructure:"kubernetes.io/serviceaccount/secret.name"`
+	Namespace  string   `mapstructure:"kubernetes.io/serviceaccount/namespace"`
+	Aud        []string `mapstructure:"aud"`
+
+	// the JSON returned from reviewing a Projected Service account has a
+	// different structure, where the information is in a sub-structure instead of
+	// at the top level
+	Kubernetes *projectedServiceToken `mapstructure:"kubernetes.io"`
+	Expiration int64                  `mapstructure:"exp"`
+	IssuedAt   int64                  `mapstructure:"iat"`
 }
 
+// uid returns the UID for the service account, preferring the projected service
+// account value if found
 func (s *serviceAccount) uid() string {
 	if s.Kubernetes != nil && s.Kubernetes.ServiceAccount != nil {
 		return s.Kubernetes.ServiceAccount.UID
@@ -297,6 +303,9 @@ func (s *serviceAccount) uid() string {
 	return s.UID
 }
 
+// name returns the name for the service account, preferring the projected
+// service account value if found. This is "default" for projected service
+// accounts
 func (s *serviceAccount) name() string {
 	if s.Kubernetes != nil && s.Kubernetes.ServiceAccount != nil {
 		return s.Kubernetes.ServiceAccount.Name
@@ -304,6 +313,8 @@ func (s *serviceAccount) name() string {
 	return s.Name
 }
 
+// namespace returns the namespace for the service account, preferring the
+// projected service account value if found
 func (s *serviceAccount) namespace() string {
 	if s.Kubernetes != nil {
 		return s.Kubernetes.Namespace
@@ -311,13 +322,13 @@ func (s *serviceAccount) namespace() string {
 	return s.Namespace
 }
 
-type kubeServiceToken struct {
-	Namespace      string                 `mapstructure:"namespace"`
-	Pod            *kubeServiceAccountPod `mapstructure:"pod"`
-	ServiceAccount *kubeServiceAccountPod `mapstructure:"serviceaccount"`
+type projectedServiceToken struct {
+	Namespace      string                      `mapstructure:"namespace"`
+	Pod            *projectedServiceAccountPod `mapstructure:"pod"`
+	ServiceAccount *projectedServiceAccountPod `mapstructure:"serviceaccount"`
 }
 
-type kubeServiceAccountPod struct {
+type projectedServiceAccountPod struct {
 	Name string `mapstructure:"name"`
 	UID  string `mapstructure:"uid"`
 }
