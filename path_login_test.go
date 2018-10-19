@@ -23,15 +23,19 @@ var (
 	testProjectedName        = "default"
 	testProjectedUID         = "b389b3b2-d302-11e8-b14c-080027e55ea8"
 	testProjectedMockFactory = mockTokenReviewFactory(testProjectedName, testNamespace, testProjectedUID)
+
+	testDefaultPEMs = []string{testECCert, testRSACert}
+	testNoPEMs      = []string{testECCert, testRSACert}
 )
 
-func setupBackend(t *testing.T, noPEMs bool) (logical.Backend, logical.Storage) {
+func setupBackend(t *testing.T, pems []string) (logical.Backend, logical.Storage) {
 	b, storage := getBackend(t)
 
-	pems := []string{testECCert, testRSACert, testMinikubePubKey}
-	if noPEMs {
-		pems = []string{}
-	}
+	// pems := []string{testECCert, testRSACert, testMinikubePubKey}
+	// pems := []string{testECCert, testRSACert}
+	// if noPEMs {
+	// 	pems = []string{}
+	// }
 
 	// test no certificate
 	data := map[string]interface{}{
@@ -79,7 +83,7 @@ func setupBackend(t *testing.T, noPEMs bool) (logical.Backend, logical.Storage) 
 }
 
 func TestLogin(t *testing.T) {
-	b, storage := setupBackend(t, false)
+	b, storage := setupBackend(t, testDefaultPEMs)
 
 	// Test bad inputs
 	data := map[string]interface{}{
@@ -202,7 +206,7 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogin_ECDSA_PEM(t *testing.T) {
-	b, storage := setupBackend(t, true)
+	b, storage := setupBackend(t, testNoPEMs)
 
 	// test no certificate
 	data := map[string]interface{}{
@@ -243,7 +247,7 @@ func TestLogin_ECDSA_PEM(t *testing.T) {
 }
 
 func TestLogin_NoPEMs(t *testing.T) {
-	b, storage := setupBackend(t, true)
+	b, storage := setupBackend(t, testNoPEMs)
 
 	// test bad jwt service account
 	data := map[string]interface{}{
@@ -285,7 +289,7 @@ func TestLogin_NoPEMs(t *testing.T) {
 }
 
 func TestAliasLookAhead(t *testing.T) {
-	b, storage := setupBackend(t, false)
+	b, storage := setupBackend(t, testDefaultPEMs)
 
 	// Test bad inputs
 	data := map[string]interface{}{
@@ -324,7 +328,7 @@ Pk9Yf9rIf374m5XP1U8q79dBhLSIuaojsvOT39UUcPJROSD1FqYLued0rXiooIii
 -----END PUBLIC KEY-----`
 
 func TestLoginProjectedToken(t *testing.T) {
-	b, storage := setupBackend(t, false)
+	b, storage := setupBackend(t, append(testDefaultPEMs, testMinikubePubKey))
 
 	// update backend to accept "default" bound account name
 	data := map[string]interface{}{
