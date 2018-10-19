@@ -179,10 +179,6 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 			"iss": expectedJWTIssuer,
 		},
 		Fn: func(c jwt.Claims) error {
-			var keys []string
-			for k := range c {
-				keys = append(keys, k)
-			}
 			// Decode claims into a service account object
 			err := mapstructure.Decode(c, sa)
 			if err != nil {
