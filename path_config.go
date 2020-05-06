@@ -168,7 +168,7 @@ type kubeConfig struct {
 	TokenReviewerJWT string `json:"token_reviewer_jwt"`
 	// Issuer is the claim that specifies who issued the token
 	Issuer string `json:"issuer"`
-	// ValidateISSClaim is an option to skip ISS validation
+	// ValidateISSClaim is optional parameter to allow to skip ISS validation
 	ValidateISSClaim bool `json:"validate_iss_claim"`
 }
 
