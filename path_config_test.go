@@ -16,6 +16,7 @@ func TestConfig_Read(t *testing.T) {
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
 		"issuer":             "",
+		"validate_iss_claim": true,
 	}
 
 	req := &logical.Request{
@@ -135,10 +136,11 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected := &kubeConfig{
-		PublicKeys: []interface{}{},
-		PEMKeys:    []string{},
-		Host:       "host",
-		CACert:     testCACert,
+		PublicKeys:       []interface{}{},
+		PEMKeys:          []string{},
+		Host:             "host",
+		CACert:           testCACert,
+		ValidateISSClaim: true,
 	}
 
 	conf, err := b.(*kubeAuthBackend).config(context.Background(), storage)
@@ -180,6 +182,7 @@ func TestConfig(t *testing.T) {
 		Host:             "host",
 		CACert:           testCACert,
 		TokenReviewerJWT: jwtData,
+		ValidateISSClaim: true,
 	}
 
 	conf, err = b.(*kubeAuthBackend).config(context.Background(), storage)
@@ -216,10 +219,11 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected = &kubeConfig{
-		PublicKeys: []interface{}{cert},
-		PEMKeys:    []string{testRSACert},
-		Host:       "host",
-		CACert:     testCACert,
+		PublicKeys:       []interface{}{cert},
+		PEMKeys:          []string{testRSACert},
+		Host:             "host",
+		CACert:           testCACert,
+		ValidateISSClaim: true,
 	}
 
 	conf, err = b.(*kubeAuthBackend).config(context.Background(), storage)
@@ -261,10 +265,11 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected = &kubeConfig{
-		PublicKeys: []interface{}{cert, cert2},
-		PEMKeys:    []string{testRSACert, testECCert},
-		Host:       "host",
-		CACert:     testCACert,
+		PublicKeys:       []interface{}{cert, cert2},
+		PEMKeys:          []string{testRSACert, testECCert},
+		Host:             "host",
+		CACert:           testCACert,
+		ValidateISSClaim: true,
 	}
 
 	conf, err = b.(*kubeAuthBackend).config(context.Background(), storage)

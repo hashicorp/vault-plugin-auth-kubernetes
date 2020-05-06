@@ -57,6 +57,14 @@ extracted. Not every installation of Kuberentes exposes these keys.`,
 					Name: "JWT Issuer",
 				},
 			},
+			"validate_iss_claim": {
+				Type:        framework.TypeBool,
+				Description: "Optional JWT issuer validation. Allows to skip ISS validation, enabled by default",
+				Default:     true,
+				DisplayAttrs: &framework.DisplayAttributes{
+					Name: "JWT Issuer Validation",
+				},
+			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.UpdateOperation: b.pathConfigWrite,
@@ -83,6 +91,7 @@ func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Reque
 				"kubernetes_ca_cert": config.CACert,
 				"pem_keys":           config.PEMKeys,
 				"issuer":             config.Issuer,
+				"validate_iss_claim": config.ValidateISSClaim,
 			},
 		}
 
@@ -100,6 +109,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	pemList := data.Get("pem_keys").([]string)
 	caCert := data.Get("kubernetes_ca_cert").(string)
 	issuer := data.Get("issuer").(string)
+	validateIssClaim := data.Get("validate_iss_claim").(bool)
 	if len(pemList) == 0 && len(caCert) == 0 {
 		return logical.ErrorResponse("one of pem_keys or kubernetes_ca_cert must be set"), nil
 	}
@@ -120,6 +130,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		CACert:           caCert,
 		TokenReviewerJWT: tokenReviewer,
 		Issuer:           issuer,
+		ValidateISSClaim: validateIssClaim,
 	}
 
 	var err error
@@ -157,6 +168,8 @@ type kubeConfig struct {
 	TokenReviewerJWT string `json:"token_reviewer_jwt"`
 	// Issuer is the claim that specifies who issued the token
 	Issuer string `json:"issuer"`
+	// ValidateISSClaim is an option to skip ISS validation
+	ValidateISSClaim bool `json:"validate_iss_claim"`
 }
 
 // PasrsePublicKeyPEM is used to parse RSA and ECDSA public keys from PEMs

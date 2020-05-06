@@ -11,9 +11,11 @@ require (
 	github.com/hashicorp/go-hclog v0.12.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/go-sockaddr v1.0.2
+	github.com/hashicorp/go-version v1.2.0 // indirect
 	github.com/hashicorp/vault/api v1.0.5-0.20200215224050-f6547fa8e820
 	github.com/hashicorp/vault/sdk v0.1.14-0.20200215224050-f6547fa8e820
 	github.com/hashicorp/yamux v0.0.0-20181012175058-2f1d1f20f75d // indirect
+	github.com/mitchellh/gox v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
 	google.golang.org/genproto v0.0.0-20190404172233-64821d5d2107 // indirect
 	k8s.io/api v0.0.0-20190409092523-d687e77c8ae9
