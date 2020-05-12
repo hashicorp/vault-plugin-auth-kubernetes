@@ -12,11 +12,11 @@ func TestConfig_Read(t *testing.T) {
 	b, storage := getBackend(t)
 
 	data := map[string]interface{}{
-		"pem_keys":           []string{testRSACert, testECCert},
-		"kubernetes_host":    "host",
-		"kubernetes_ca_cert": testCACert,
-		"issuer":             "",
-		"validate_iss_claim": true,
+		"pem_keys":               []string{testRSACert, testECCert},
+		"kubernetes_host":        "host",
+		"kubernetes_ca_cert":     testCACert,
+		"issuer":                 "",
+		"disable_iss_validation": false,
 	}
 
 	req := &logical.Request{
@@ -136,11 +136,11 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected := &kubeConfig{
-		PublicKeys:       []interface{}{},
-		PEMKeys:          []string{},
-		Host:             "host",
-		CACert:           testCACert,
-		ValidateISSClaim: true,
+		PublicKeys:           []interface{}{},
+		PEMKeys:              []string{},
+		Host:                 "host",
+		CACert:               testCACert,
+		DisableISSValidation: false,
 	}
 
 	conf, err := b.(*kubeAuthBackend).config(context.Background(), storage)
@@ -177,12 +177,12 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected = &kubeConfig{
-		PublicKeys:       []interface{}{},
-		PEMKeys:          []string{},
-		Host:             "host",
-		CACert:           testCACert,
-		TokenReviewerJWT: jwtData,
-		ValidateISSClaim: true,
+		PublicKeys:           []interface{}{},
+		PEMKeys:              []string{},
+		Host:                 "host",
+		CACert:               testCACert,
+		TokenReviewerJWT:     jwtData,
+		DisableISSValidation: false,
 	}
 
 	conf, err = b.(*kubeAuthBackend).config(context.Background(), storage)
@@ -219,11 +219,11 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected = &kubeConfig{
-		PublicKeys:       []interface{}{cert},
-		PEMKeys:          []string{testRSACert},
-		Host:             "host",
-		CACert:           testCACert,
-		ValidateISSClaim: true,
+		PublicKeys:           []interface{}{cert},
+		PEMKeys:              []string{testRSACert},
+		Host:                 "host",
+		CACert:               testCACert,
+		DisableISSValidation: false,
 	}
 
 	conf, err = b.(*kubeAuthBackend).config(context.Background(), storage)
@@ -265,11 +265,11 @@ func TestConfig(t *testing.T) {
 	}
 
 	expected = &kubeConfig{
-		PublicKeys:       []interface{}{cert, cert2},
-		PEMKeys:          []string{testRSACert, testECCert},
-		Host:             "host",
-		CACert:           testCACert,
-		ValidateISSClaim: true,
+		PublicKeys:           []interface{}{cert, cert2},
+		PEMKeys:              []string{testRSACert, testECCert},
+		Host:                 "host",
+		CACert:               testCACert,
+		DisableISSValidation: false,
 	}
 
 	conf, err = b.(*kubeAuthBackend).config(context.Background(), storage)
