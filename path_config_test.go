@@ -280,6 +280,47 @@ func TestConfig(t *testing.T) {
 	if !reflect.DeepEqual(expected, conf) {
 		t.Fatalf("expected did not match actual: expected %#v\n got %#v\n", expected, conf)
 	}
+
+	// Test success with disabled iss validation
+	data = map[string]interface{}{
+		"kubernetes_host":        "host",
+		"kubernetes_ca_cert":     testCACert,
+		"disable_iss_validation": true,
+	}
+
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      configPath,
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	cert, err = parsePublicKeyPEM([]byte(testRSACert))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected = &kubeConfig{
+		PublicKeys:           []interface{}{},
+		PEMKeys:              []string{},
+		Host:                 "host",
+		CACert:               testCACert,
+		DisableISSValidation: true,
+	}
+
+	conf, err = b.(*kubeAuthBackend).config(context.Background(), storage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(expected, conf) {
+		t.Fatalf("expected did not match actual: expected %#v\n got %#v\n", expected, conf)
+	}
 }
 
 var testRSACert string = `-----BEGIN CERTIFICATE-----
