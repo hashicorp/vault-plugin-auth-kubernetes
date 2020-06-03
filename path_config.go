@@ -59,7 +59,7 @@ extracted. Not every installation of Kuberentes exposes these keys.`,
 			},
 			"disable_iss_validation": {
 				Type:        framework.TypeBool,
-				Description: "Optional JWT issuer validation. Allows to skip ISS validation.",
+				Description: "Disable JWT issuer validation. Allows to skip ISS validation.",
 				Default:     false,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Disable JWT Issuer Validation",
