@@ -115,17 +115,16 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	caCert := data.Get("kubernetes_ca_cert").(string)
 	issuer := data.Get("issuer").(string)
 	disableIssValidation := data.Get("disable_iss_validation").(bool)
+	tokenReviewer := data.Get("token_reviewer_jwt").(string)
 	if len(pemList) == 0 && len(caCert) == 0 {
 		if len(localCACert) > 0 {
 			caCert = string(localCACert)
+			if len(tokenReviewer) == 0 && len(localTokenReviewer) > 0 {
+				tokenReviewer = string(localTokenReviewer)
+			}
 		} else {
 			return logical.ErrorResponse("one of pem_keys or kubernetes_ca_cert must be set"), nil
 		}
-	}
-
-	tokenReviewer := data.Get("token_reviewer_jwt").(string)
-	if len(tokenReviewer) == 0 && len(localTokenReviewer) > 0 {
-		tokenReviewer = string(localTokenReviewer)
 	}
 
 	if len(tokenReviewer) > 0 {
