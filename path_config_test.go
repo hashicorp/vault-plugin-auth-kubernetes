@@ -333,179 +333,104 @@ func TestConfig(t *testing.T) {
 func TestConfig_LocalCaJWT(t *testing.T) {
 	b, storage := getBackend(t)
 
-	t.Run("no CA or JWT, default to local", func(t *testing.T) {
-		data := map[string]interface{}{
-			"kubernetes_host": "host",
-		}
+	// write "local" CA and JWT, and override local path vars
+	caFile := writeToTempFile(t, testLocalCACert)
+	localCACertPath = caFile
+	defer os.Remove(caFile)
+	jwtFile := writeToTempFile(t, testLocalJWT)
+	localJWTPath = jwtFile
+	defer os.Remove(jwtFile)
 
-		// write "local" CA and JWT, and override local path vars
-		caFile := writeToTempFile(t, testLocalCACert)
-		localCACertPath = caFile
-		defer os.Remove(caFile)
-		jwtFile := writeToTempFile(t, testLocalJWT)
-		localJWTPath = jwtFile
-		defer os.Remove(jwtFile)
+	testCases := map[string]struct {
+		config   map[string]interface{}
+		expected *kubeConfig
+	}{
+		"no CA or JWT, default to local": {
+			config: map[string]interface{}{
+				"kubernetes_host": "host",
+			},
+			expected: &kubeConfig{
+				PublicKeys:           []interface{}{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               testLocalCACert,
+				TokenReviewerJWT:     testLocalJWT,
+				DisableISSValidation: false,
+				DisableLocalCAJwt:    false,
+			},
+		},
+		"CA set, default to local JWT": {
+			config: map[string]interface{}{
+				"kubernetes_host":    "host",
+				"kubernetes_ca_cert": testCACert,
+			},
+			expected: &kubeConfig{
+				PublicKeys:           []interface{}{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               testCACert,
+				TokenReviewerJWT:     testLocalJWT,
+				DisableISSValidation: false,
+				DisableLocalCAJwt:    false,
+			},
+		},
+		"JWT set, default to local CA": {
+			config: map[string]interface{}{
+				"kubernetes_host":    "host",
+				"token_reviewer_jwt": jwtData,
+			},
+			expected: &kubeConfig{
+				PublicKeys:           []interface{}{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               testLocalCACert,
+				TokenReviewerJWT:     jwtData,
+				DisableISSValidation: false,
+				DisableLocalCAJwt:    false,
+			},
+		},
+		"CA and disable local default": {
+			config: map[string]interface{}{
+				"kubernetes_host":      "host",
+				"kubernetes_ca_cert":   testCACert,
+				"disable_local_ca_jwt": true,
+			},
+			expected: &kubeConfig{
+				PublicKeys:           []interface{}{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               testCACert,
+				TokenReviewerJWT:     "",
+				DisableISSValidation: false,
+				DisableLocalCAJwt:    true,
+			},
+		},
+	}
 
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			req := &logical.Request{
+				Operation: logical.CreateOperation,
+				Path:      configPath,
+				Storage:   storage,
+				Data:      tc.config,
+			}
 
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
+			resp, err := b.HandleRequest(context.Background(), req)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
 
-		expected := &kubeConfig{
-			PublicKeys:           []interface{}{},
-			PEMKeys:              []string{},
-			Host:                 "host",
-			CACert:               testLocalCACert,
-			TokenReviewerJWT:     testLocalJWT,
-			DisableISSValidation: false,
-			DisableLocalCAJwt:    false,
-		}
+			conf, err := b.(*kubeAuthBackend).config(context.Background(), storage)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		conf, err := b.(*kubeAuthBackend).config(context.Background(), storage)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(expected, conf) {
-			t.Fatalf("expected did not match actual: expected %#v\n got %#v\n", expected, conf)
-		}
-
-	})
-
-	t.Run("CA set, default to local JWT", func(t *testing.T) {
-		data := map[string]interface{}{
-			"kubernetes_host":    "host",
-			"kubernetes_ca_cert": testCACert,
-		}
-
-		// write "local" JWT, and override local path var
-		jwtFile := writeToTempFile(t, testLocalJWT)
-		localJWTPath = jwtFile
-		defer os.Remove(jwtFile)
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		expected := &kubeConfig{
-			PublicKeys:           []interface{}{},
-			PEMKeys:              []string{},
-			Host:                 "host",
-			CACert:               testCACert,
-			TokenReviewerJWT:     testLocalJWT,
-			DisableISSValidation: false,
-			DisableLocalCAJwt:    false,
-		}
-
-		conf, err := b.(*kubeAuthBackend).config(context.Background(), storage)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(expected, conf) {
-			t.Fatalf("expected did not match actual: expected %#v\n got %#v\n", expected, conf)
-		}
-
-	})
-
-	t.Run("JWT set, default to local CA", func(t *testing.T) {
-		data := map[string]interface{}{
-			"kubernetes_host":    "host",
-			"token_reviewer_jwt": jwtData,
-		}
-
-		// write "local" CA, and override local path var
-		caFile := writeToTempFile(t, testLocalCACert)
-		localCACertPath = caFile
-		defer os.Remove(caFile)
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		expected := &kubeConfig{
-			PublicKeys:           []interface{}{},
-			PEMKeys:              []string{},
-			Host:                 "host",
-			CACert:               testLocalCACert,
-			TokenReviewerJWT:     jwtData,
-			DisableISSValidation: false,
-			DisableLocalCAJwt:    false,
-		}
-
-		conf, err := b.(*kubeAuthBackend).config(context.Background(), storage)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(expected, conf) {
-			t.Fatalf("expected did not match actual: expected %#v\n got %#v\n", expected, conf)
-		}
-
-	})
-
-	t.Run("CA and disable local default", func(t *testing.T) {
-		data := map[string]interface{}{
-			"kubernetes_host":      "host",
-			"kubernetes_ca_cert":   testCACert,
-			"disable_local_ca_jwt": true,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		expected := &kubeConfig{
-			PublicKeys:           []interface{}{},
-			PEMKeys:              []string{},
-			Host:                 "host",
-			CACert:               testCACert,
-			TokenReviewerJWT:     "",
-			DisableISSValidation: false,
-			DisableLocalCAJwt:    true,
-		}
-
-		conf, err := b.(*kubeAuthBackend).config(context.Background(), storage)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(expected, conf) {
-			t.Fatalf("expected did not match actual: expected %#v\n got %#v\n", expected, conf)
-		}
-
-	})
+			if !reflect.DeepEqual(tc.expected, conf) {
+				t.Fatalf("expected did not match actual: expected %#v\n got %#v\n", tc.expected, conf)
+			}
+		})
+	}
 }
 
 func writeToTempFile(t *testing.T, contents string) string {
