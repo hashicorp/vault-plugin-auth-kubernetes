@@ -840,11 +840,11 @@ func TestLoginProjectedToken(t *testing.T) {
 				}
 			}
 			if resp == nil && err != nil {
-				if tc.e != nil && tc.e.Error() != err.Error() {
-					t.Fatalf("error mismatch, expected (%s) got (%s)", tc.e, err)
-				}
 				if tc.e == nil {
 					t.Fatalf("unexpected err: (%s)", err)
+				}
+				if tc.e.Error() != err.Error() {
+					t.Fatalf("error mismatch, expected (%s) got (%s)", tc.e, err)
 				}
 			}
 		})
