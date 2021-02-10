@@ -109,9 +109,10 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrPermissionDenied
 	}
 
+	displayName := fmt.Sprintf("%s-%s", serviceAccount.namespace(), serviceAccount.name())
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
-			Name: serviceAccount.uid(),
+			Name: displayName,
 			Metadata: map[string]string{
 				"service_account_uid":         serviceAccount.uid(),
 				"service_account_name":        serviceAccount.name(),
@@ -129,7 +130,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 			"service_account_secret_name": serviceAccount.SecretName,
 			"role":                        roleName,
 		},
-		DisplayName: fmt.Sprintf("%s-%s", serviceAccount.namespace(), serviceAccount.name()),
+		DisplayName: displayName,
 	}
 
 	role.PopulateTokenAuth(auth)
