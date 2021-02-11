@@ -49,9 +49,9 @@ are allowed.`,
 					Type:        framework.TypeString,
 					Description: "Optional Audience claim to verify in the jwt.",
 				},
-				"human_readable_alias" {
+				"human_readable_alias": {
 					Type: 			 framework.TypeBool,
-					Description: "Use Kubernetes Namepsace/ServiceAccount instead of Service Accounts UID for Alias name"
+					Description: "Use Kubernetes Namepsace/ServiceAccount instead of Service Accounts UID for Alias name",
 				},
 				"policies": {
 					Type:        framework.TypeCommaStringSlice,
