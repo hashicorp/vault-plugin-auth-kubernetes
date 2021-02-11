@@ -332,6 +332,9 @@ type roleStorageEntry struct {
 	// Audience is an optional jwt claim to verify
 	Audience string `json:"audience" mapstructure:"audience" structs: "audience"`
 
+	// use the service accounts 'namespace/name' instead of uid for the alias name
+	HumanReadableAlias bool `json:"human_readable_alias" mapstructure:"human_readable_alias" structs:"human_readable_alias"`
+
 	// Deprecated by TokenParams
 	Policies   []string      `json:"policies" structs:"policies" mapstructure:"policies"`
 	NumUses    int           `json:"num_uses" mapstructure:"num_uses" structs:"num_uses"`
