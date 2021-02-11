@@ -49,6 +49,10 @@ are allowed.`,
 					Type:        framework.TypeString,
 					Description: "Optional Audience claim to verify in the jwt.",
 				},
+				"human_readable_alias" {
+					Type: 			 framework.TypeBool,
+					Description: "Use Kubernetes Namepsace/ServiceAccount instead of Service Accounts UID for Alias name"
+				},
 				"policies": {
 					Type:        framework.TypeCommaStringSlice,
 					Description: tokenutil.DeprecationText("token_policies"),
@@ -151,6 +155,8 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 	if role.Audience != "" {
 		d["audience"] = role.Audience
 	}
+
+	d["human_readable_alias"] = role.HumanReadableAlias
 
 	role.PopulateTokenData(d)
 
@@ -300,6 +306,10 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	// optional audience field
 	if audience, ok := data.GetOk("audience"); ok {
 		role.Audience = audience.(string)
+	}
+
+	if humanReadableAlias, ok := data.GetOk("human_readable_alias"); ok {
+		role.HumanReadableAlias = humanReadableAlias.(bool)
 	}
 
 	// Store the entry.
