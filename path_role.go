@@ -51,7 +51,7 @@ are allowed.`,
 				},
 				"human_readable_alias": {
 					Type: 			 framework.TypeBool,
-					Description: "Use Kubernetes Namepsace/ServiceAccount instead of Service Accounts UID for Alias name",
+					Description: `Use "Kubernete's Namespace/Service Account Name" instead of the UID for the alias name.`,
 				},
 				"policies": {
 					Type:        framework.TypeCommaStringSlice,
