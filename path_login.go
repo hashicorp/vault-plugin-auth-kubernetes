@@ -109,7 +109,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 
 	var name = serviceAccount.uid()
 	if role.HumanReadableAlias {
-			name = fmt.Sprintf("%s/%s", serviceAccount.namespace(), serviceAccount.name())
+		name = fmt.Sprintf("%s/%s", serviceAccount.namespace(), serviceAccount.name())
 	}
 
 	auth := &logical.Auth{
