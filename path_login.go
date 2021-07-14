@@ -343,12 +343,12 @@ func (s *serviceAccount) namespace() string {
 }
 
 type projectedServiceToken struct {
-	Namespace      string     `mapstructure:"namespace"`
-	Pod            *reference `mapstructure:"pod"`
-	ServiceAccount *reference `mapstructure:"serviceaccount"`
+	Namespace      string        `mapstructure:"namespace"`
+	Pod            *k8sObjectRef `mapstructure:"pod"`
+	ServiceAccount *k8sObjectRef `mapstructure:"serviceaccount"`
 }
 
-type reference struct {
+type k8sObjectRef struct {
 	Name string `mapstructure:"name"`
 	UID  string `mapstructure:"uid"`
 }
