@@ -49,6 +49,10 @@ are allowed.`,
 					Type:        framework.TypeString,
 					Description: "Optional Audience claim to verify in the jwt.",
 				},
+				"human_readable_alias": {
+					Type: 			 framework.TypeBool,
+					Description: `Use "Kubernete's Namespace/Service Account Name" instead of the UID for the alias name.`,
+				},
 				"policies": {
 					Type:        framework.TypeCommaStringSlice,
 					Description: tokenutil.DeprecationText("token_policies"),
@@ -151,6 +155,8 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 	if role.Audience != "" {
 		d["audience"] = role.Audience
 	}
+
+	d["human_readable_alias"] = role.HumanReadableAlias
 
 	role.PopulateTokenData(d)
 
@@ -302,6 +308,10 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		role.Audience = audience.(string)
 	}
 
+	if humanReadableAlias, ok := data.GetOk("human_readable_alias"); ok {
+		role.HumanReadableAlias = humanReadableAlias.(bool)
+	}
+
 	// Store the entry.
 	entry, err := logical.StorageEntryJSON("role/"+strings.ToLower(roleName), role)
 	if err != nil {
@@ -331,6 +341,9 @@ type roleStorageEntry struct {
 
 	// Audience is an optional jwt claim to verify
 	Audience string `json:"audience" mapstructure:"audience" structs: "audience"`
+
+	// use the service accounts 'namespace/name' instead of uid for the alias name
+	HumanReadableAlias bool `json:"human_readable_alias" mapstructure:"human_readable_alias" structs:"human_readable_alias"`
 
 	// Deprecated by TokenParams
 	Policies   []string      `json:"policies" structs:"policies" mapstructure:"policies"`

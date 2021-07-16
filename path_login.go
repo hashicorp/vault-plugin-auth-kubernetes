@@ -107,9 +107,14 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrPermissionDenied
 	}
 
+	var name = serviceAccount.uid()
+	if role.HumanReadableAlias {
+		name = fmt.Sprintf("%s/%s", serviceAccount.namespace(), serviceAccount.name())
+	}
+
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
-			Name: serviceAccount.uid(),
+			Name: name,
 			Metadata: map[string]string{
 				"service_account_uid":         serviceAccount.uid(),
 				"service_account_name":        serviceAccount.name(),
