@@ -50,7 +50,7 @@ are allowed.`,
 					Description: "Optional Audience claim to verify in the jwt.",
 				},
 				"human_readable_alias": {
-					Type: 			 framework.TypeBool,
+					Type:        framework.TypeBool,
 					Description: `Use "Kubernete's Namespace/Service Account Name" instead of the UID for the alias name.`,
 				},
 				"policies": {
