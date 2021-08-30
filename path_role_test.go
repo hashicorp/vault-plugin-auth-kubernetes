@@ -201,6 +201,7 @@ func TestPath_Read(t *testing.T) {
 		"token_type":                       logical.TokenTypeDefault.String(),
 		"token_explicit_max_ttl":           int64(0),
 		"token_no_default_policy":          false,
+		"human_readable_alias":             false,
 	}
 
 	req := &logical.Request{
