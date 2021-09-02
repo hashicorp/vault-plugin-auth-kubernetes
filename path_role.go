@@ -49,9 +49,10 @@ are allowed.`,
 					Type:        framework.TypeString,
 					Description: "Optional Audience claim to verify in the jwt.",
 				},
-				"human_readable_alias": {
-					Type:        framework.TypeBool,
-					Description: `Use "Kubernete's Namespace/Service Account Name" instead of the UID for the alias name.`,
+				"alias_name_source": {
+					Type:        framework.TypeString,
+					Description: fmt.Sprintf(`Source to use when deriving the Alias' name, valid choices: %s`, getAliasNameSourceDesc()),
+					Default:     aliasNameSourceDefault,
 				},
 				"policies": {
 					Type:        framework.TypeCommaStringSlice,
@@ -156,7 +157,7 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 		d["audience"] = role.Audience
 	}
 
-	d["human_readable_alias"] = role.HumanReadableAlias
+	d["alias_name_source"] = role.AliasNameSource
 
 	role.PopulateTokenData(d)
 
@@ -308,8 +309,11 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		role.Audience = audience.(string)
 	}
 
-	if humanReadableAlias, ok := data.GetOk("human_readable_alias"); ok {
-		role.HumanReadableAlias = humanReadableAlias.(bool)
+	if source, ok := data.GetOk("alias_name_source"); ok {
+		if err := validateAliasNameSource(source.(string)); err != nil {
+			return logical.ErrorResponse(err.Error()), nil
+		}
+		role.AliasNameSource = source.(string)
 	}
 
 	// Store the entry.
@@ -342,8 +346,8 @@ type roleStorageEntry struct {
 	// Audience is an optional jwt claim to verify
 	Audience string `json:"audience" mapstructure:"audience" structs: "audience"`
 
-	// use the service accounts 'namespace/name' instead of uid for the alias name
-	HumanReadableAlias bool `json:"human_readable_alias" mapstructure:"human_readable_alias" structs:"human_readable_alias"`
+	// AliasNameSource used when deriving the Alias' name.
+	AliasNameSource string `json:"alias_name_source" mapstructure:"alias_name_source" structs:"alias_name_source"`
 
 	// Deprecated by TokenParams
 	Policies   []string      `json:"policies" structs:"policies" mapstructure:"policies"`

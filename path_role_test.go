@@ -64,6 +64,7 @@ func TestPath_Create(t *testing.T) {
 		MaxTTL:                   5 * time.Second,
 		NumUses:                  12,
 		BoundCIDRs:               nil,
+		AliasNameSource:          aliasNameSourceDefault,
 	}
 
 	req := &logical.Request{
@@ -201,7 +202,7 @@ func TestPath_Read(t *testing.T) {
 		"token_type":                       logical.TokenTypeDefault.String(),
 		"token_explicit_max_ttl":           int64(0),
 		"token_no_default_policy":          false,
-		"human_readable_alias":             false,
+		"alias_name_source":                aliasNameSourceDefault,
 	}
 
 	req := &logical.Request{
