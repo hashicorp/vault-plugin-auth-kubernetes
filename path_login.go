@@ -108,7 +108,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	var aliasName string
 	switch role.AliasNameSource {
 	case aliasNameSourceSAToken:
-		aliasName = serviceAccount.UID
+		aliasName = serviceAccount.uid()
 	case aliasNameSourceSAPath:
 		aliasName = fmt.Sprintf("%s/%s", serviceAccount.Namespace, serviceAccount.Name)
 	default:
