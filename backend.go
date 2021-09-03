@@ -15,6 +15,8 @@ const (
 	configPath = "config"
 	rolePrefix = "role/"
 
+	// aliasNameSourceUnset provides backwards compatibility with preexisting roles.
+	aliasNameSourceUnset   = ""
 	aliasNameSourceSAToken = "sa_token"
 	aliasNameSourceSAPath  = "sa_path"
 	aliasNameSourceDefault = aliasNameSourceSAToken
@@ -142,15 +144,12 @@ func (b *kubeAuthBackend) role(ctx context.Context, s logical.Storage, name stri
 	if len(role.TokenBoundCIDRs) == 0 && len(role.BoundCIDRs) > 0 {
 		role.TokenBoundCIDRs = role.BoundCIDRs
 	}
-	if role.AliasNameSource == "" {
-		role.AliasNameSource = aliasNameSourceDefault
-	}
 
 	return role, nil
 }
 
 func validateAliasNameSource(source string) error {
-	for s := range aliasNameSourceMap {
+	for _, s := range aliasNameSources {
 		if s == source {
 			return nil
 		}

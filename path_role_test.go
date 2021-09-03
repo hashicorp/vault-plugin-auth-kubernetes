@@ -45,6 +45,7 @@ func TestPath_Create(t *testing.T) {
 		"ttl":                              "1s",
 		"num_uses":                         12,
 		"max_ttl":                          "5s",
+		"alias_name_source":                aliasNameSourceDefault,
 	}
 
 	expected := &roleStorageEntry{

@@ -157,8 +157,6 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 		d["audience"] = role.Audience
 	}
 
-	d["alias_name_source"] = role.AliasNameSource
-
 	role.PopulateTokenData(d)
 
 	if len(role.Policies) > 0 {
@@ -179,6 +177,8 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 	if role.NumUses > 0 {
 		d["num_uses"] = role.NumUses
 	}
+
+	d["alias_name_source"] = role.AliasNameSource
 
 	return &logical.Response{
 		Data: d,
@@ -314,6 +314,10 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 			return logical.ErrorResponse(err.Error()), nil
 		}
 		role.AliasNameSource = source.(string)
+	} else if role.AliasNameSource == aliasNameSourceUnset {
+		if s, ok := data.Schema["alias_name_source"]; ok {
+			role.AliasNameSource = s.Default.(string)
+		}
 	}
 
 	// Store the entry.

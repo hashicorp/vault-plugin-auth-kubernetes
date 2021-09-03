@@ -95,24 +95,14 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, errors.New("could not load backend configuration")
 	}
 
-	if err := validateAliasNameSource(role.AliasNameSource); err != nil {
-		b.Logger().Error(err.Error())
-		return nil, err
-	}
-
 	serviceAccount, err := b.parseAndValidateJWT(jwtStr, role, config)
 	if err != nil {
 		return nil, err
 	}
 
-	var aliasName string
-	switch role.AliasNameSource {
-	case aliasNameSourceSAToken:
-		aliasName = serviceAccount.uid()
-	case aliasNameSourceSAPath:
-		aliasName = fmt.Sprintf("%s/%s", serviceAccount.Namespace, serviceAccount.Name)
-	default:
-		return nil, fmt.Errorf("unknown alias_name_source %q", role.AliasNameSource)
+	aliasName, err := b.getAliasName(role, serviceAccount)
+	if err != nil {
+		return nil, err
 	}
 
 	// look up the JWT token in the kubernetes API
@@ -150,6 +140,17 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	return &logical.Response{
 		Auth: auth,
 	}, nil
+}
+
+func (b *kubeAuthBackend) getAliasName(role *roleStorageEntry, serviceAccount *serviceAccount) (string, error) {
+	switch role.AliasNameSource {
+	case aliasNameSourceSAToken, aliasNameSourceUnset:
+		return serviceAccount.uid(), nil
+	case aliasNameSourceSAPath:
+		return fmt.Sprintf("%s/%s", serviceAccount.Namespace, serviceAccount.Name), nil
+	default:
+		return "", fmt.Errorf("unknown alias_name_source %q", role.AliasNameSource)
+	}
 }
 
 // aliasLookahead returns the alias object with the SA UID from the JWT
