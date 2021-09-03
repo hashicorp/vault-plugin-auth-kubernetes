@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 
@@ -21,11 +20,15 @@ const (
 	aliasNameSourceDefault = aliasNameSourceSAToken
 )
 
-// map alias name source to its description
-var aliasNameSourceMap = map[string]string{
-	aliasNameSourceSAToken: "format: <token.uid>",
-	aliasNameSourceSAPath:  "format: <namespace>/<serviceaccount>",
-}
+var (
+	aliasNameSources = []string{aliasNameSourceSAToken, aliasNameSourceSAPath}
+	// map alias name source to its description
+	aliasNameSourceMap = map[string]string{
+		aliasNameSourceSAToken: "format: <token.uid>",
+		aliasNameSourceSAPath:  "format: <namespace>/<serviceaccount>",
+	}
+	errInvalidAliasNameSource = fmt.Errorf(`invalid alias_name_source, must be one of: %s`, strings.Join(aliasNameSources, ", "))
+)
 
 // kubeAuthBackend implements logical.Backend
 type kubeAuthBackend struct {
@@ -147,28 +150,23 @@ func (b *kubeAuthBackend) role(ctx context.Context, s logical.Storage, name stri
 }
 
 func validateAliasNameSource(source string) error {
-	sources := make([]string, len(aliasNameSourceMap))
-	i := 0
 	for s := range aliasNameSourceMap {
 		if s == source {
 			return nil
 		}
-		sources[i] = s
-		i++
 	}
-	sort.Strings(sources)
-	return fmt.Errorf(`invalid alias_name_source, must be one of: %s`, strings.Join(sources, ", "))
+	return errInvalidAliasNameSource
 }
 
 func getAliasNameSourceDesc() string {
-	var desc []string
-	for s, d := range aliasNameSourceMap {
+	var desc = make([]string, len(aliasNameSources))
+	for i, s := range aliasNameSources {
+		d := aliasNameSourceMap[s]
 		if s == aliasNameSourceDefault {
 			d = d + " [default]"
 		}
-		desc = append(desc, fmt.Sprintf("%q (%s)", s, d))
+		desc[i] = fmt.Sprintf("%q (%s)", s, d)
 	}
-	sort.Strings(desc)
 	return strings.Join(desc, ", ")
 }
 
