@@ -112,11 +112,15 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrPermissionDenied
 	}
 
+	uid, err := serviceAccount.uid()
+	if err != nil {
+		return nil, err
+	}
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
 			Name: aliasName,
 			Metadata: map[string]string{
-				"service_account_uid":         serviceAccount.uid(),
+				"service_account_uid":         uid,
 				"service_account_name":        serviceAccount.name(),
 				"service_account_namespace":   serviceAccount.namespace(),
 				"service_account_secret_name": serviceAccount.SecretName,
@@ -126,7 +130,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 			"role": roleName,
 		},
 		Metadata: map[string]string{
-			"service_account_uid":         serviceAccount.uid(),
+			"service_account_uid":         uid,
 			"service_account_name":        serviceAccount.name(),
 			"service_account_namespace":   serviceAccount.namespace(),
 			"service_account_secret_name": serviceAccount.SecretName,
@@ -153,7 +157,11 @@ func (b *kubeAuthBackend) getFieldValueStr(data *framework.FieldData, param stri
 func (b *kubeAuthBackend) getAliasName(role *roleStorageEntry, serviceAccount *serviceAccount) (string, error) {
 	switch role.AliasNameSource {
 	case aliasNameSourceSAToken, aliasNameSourceUnset:
-		return serviceAccount.uid(), nil
+		uid, err := serviceAccount.uid()
+		if err != nil {
+			return "", err
+		}
+		return uid, nil
 	case aliasNameSourceSAPath:
 		return fmt.Sprintf("%s/%s", serviceAccount.Namespace, serviceAccount.Name), nil
 	default:
@@ -193,10 +201,6 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 	err = mapstructure.Decode(parsedJWT.Claims(), sa)
 	if err != nil {
 		return nil, err
-	}
-
-	if sa.uid() == "" {
-		return nil, errors.New("could not parse UID from claims")
 	}
 
 	aliasName, err := b.getAliasName(role, sa)
@@ -357,11 +361,17 @@ type serviceAccount struct {
 
 // uid returns the UID for the service account, preferring the projected service
 // account value if found
-func (s *serviceAccount) uid() string {
+// return an error when the UID is empty.
+func (s *serviceAccount) uid() (string, error) {
+	uid := s.UID
 	if s.Kubernetes != nil && s.Kubernetes.ServiceAccount != nil {
-		return s.Kubernetes.ServiceAccount.UID
+		uid = s.Kubernetes.ServiceAccount.UID
 	}
-	return s.UID
+
+	if uid == "" {
+		return "", errors.New("could not parse UID from claims")
+	}
+	return uid, nil
 }
 
 // name returns the name for the service account, preferring the projected
@@ -407,7 +417,11 @@ func (s *serviceAccount) lookup(ctx context.Context, jwtStr string, tr tokenRevi
 	if s.name() != r.Name {
 		return errors.New("JWT names did not match")
 	}
-	if s.uid() != r.UID {
+	uid, err := s.uid()
+	if err != nil {
+		return err
+	}
+	if uid != r.UID {
 		return errors.New("JWT UIDs did not match")
 	}
 	if s.namespace() != r.Namespace {
