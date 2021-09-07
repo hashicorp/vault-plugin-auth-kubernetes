@@ -315,9 +315,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		}
 		role.AliasNameSource = source.(string)
 	} else if role.AliasNameSource == aliasNameSourceUnset {
-		if s, ok := data.Schema["alias_name_source"]; ok {
-			role.AliasNameSource = s.Default.(string)
-		}
+		role.AliasNameSource = data.Get("alias_name_source").(string)
 	}
 
 	// Store the entry.

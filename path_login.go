@@ -55,14 +55,14 @@ func pathLogin(b *kubeAuthBackend) *framework.Path {
 
 // pathLogin is used to authenticate to this backend
 func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleName := data.Get("role").(string)
-	if len(roleName) == 0 {
-		return logical.ErrorResponse("missing role"), nil
+	roleName, resp := b.getFieldValueStr(data, "role")
+	if resp != nil {
+		return resp, nil
 	}
 
-	jwtStr := data.Get("jwt").(string)
-	if len(jwtStr) == 0 {
-		return logical.ErrorResponse("missing jwt"), nil
+	jwtStr, resp := b.getFieldValueStr(data, "jwt")
+	if resp != nil {
+		return resp, nil
 	}
 
 	b.l.RLock()
@@ -142,6 +142,14 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	}, nil
 }
 
+func (b *kubeAuthBackend) getFieldValueStr(data *framework.FieldData, param string) (string, *logical.Response) {
+	val := data.Get(param).(string)
+	if len(val) == 0 {
+		return "", logical.ErrorResponse("missing %s", param)
+	}
+	return val, nil
+}
+
 func (b *kubeAuthBackend) getAliasName(role *roleStorageEntry, serviceAccount *serviceAccount) (string, error) {
 	switch role.AliasNameSource {
 	case aliasNameSourceSAToken, aliasNameSourceUnset:
@@ -155,10 +163,23 @@ func (b *kubeAuthBackend) getAliasName(role *roleStorageEntry, serviceAccount *s
 
 // aliasLookahead returns the alias object with the SA UID from the JWT
 // Claims.
-func (b *kubeAuthBackend) aliasLookahead(_ context.Context, _ *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	jwtStr := data.Get("jwt").(string)
-	if len(jwtStr) == 0 {
-		return logical.ErrorResponse("missing jwt"), nil
+func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	roleName, resp := b.getFieldValueStr(data, "role")
+	if resp != nil {
+		return resp, nil
+	}
+
+	jwtStr, resp := b.getFieldValueStr(data, "jwt")
+	if resp != nil {
+		return resp, nil
+	}
+
+	role, err := b.role(ctx, req.Storage, roleName)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return logical.ErrorResponse(fmt.Sprintf("invalid role name \"%s\"", roleName)), nil
 	}
 
 	// Parse into JWT
@@ -174,15 +195,19 @@ func (b *kubeAuthBackend) aliasLookahead(_ context.Context, _ *logical.Request, 
 		return nil, err
 	}
 
-	saUID := sa.uid()
-	if saUID == "" {
+	if sa.uid() == "" {
 		return nil, errors.New("could not parse UID from claims")
+	}
+
+	aliasName, err := b.getAliasName(role, sa)
+	if err != nil {
+		return nil, err
 	}
 
 	return &logical.Response{
 		Auth: &logical.Auth{
 			Alias: &logical.Alias{
-				Name: saUID,
+				Name: aliasName,
 			},
 		},
 	}, nil

@@ -591,7 +591,8 @@ func TestAliasLookAhead(t *testing.T) {
 
 	// Test bad inputs
 	data := map[string]interface{}{
-		"jwt": jwtData,
+		"jwt":  jwtData,
+		"role": "plugin-test",
 	}
 
 	req := &logical.Request{
@@ -915,7 +916,8 @@ func TestAliasLookAheadProjectedToken(t *testing.T) {
 	b, storage := setupBackend(t, config)
 
 	data := map[string]interface{}{
-		"jwt": jwtProjectedData,
+		"jwt":  jwtProjectedData,
+		"role": "plugin-test",
 	}
 
 	req := &logical.Request{
@@ -933,7 +935,7 @@ func TestAliasLookAheadProjectedToken(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	if resp.Auth.Alias.Name != "77c81ad7-1bea-4d94-9ca5-f5d7f3632331" {
+	if resp.Auth.Alias.Name != testProjectedUID {
 		t.Fatalf("Unexpected UID: %s", resp.Auth.Alias.Name)
 	}
 }
