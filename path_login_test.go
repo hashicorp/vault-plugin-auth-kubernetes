@@ -587,31 +587,94 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 }
 
 func TestAliasLookAhead(t *testing.T) {
-	b, storage := setupBackend(t, defaultTestBackendConfig())
-
-	// Test bad inputs
-	data := map[string]interface{}{
-		"jwt":  jwtData,
-		"role": "plugin-test",
-	}
-
-	req := &logical.Request{
-		Operation: logical.AliasLookaheadOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
-		Connection: &logical.Connection{
-			RemoteAddr: "127.0.0.1",
+	testCases := map[string]struct {
+		role              string
+		jwt               string
+		config            *testBackendConfig
+		expectedAliasName string
+		wantErr           error
+	}{
+		"default": {
+			role:              "plugin-test",
+			jwt:               jwtData,
+			config:            defaultTestBackendConfig(),
+			expectedAliasName: testUID,
+		},
+		"no_role": {
+			jwt:     jwtData,
+			config:  defaultTestBackendConfig(),
+			wantErr: errors.New("missing role"),
+		},
+		"no_jwt": {
+			role:    "plugin-test",
+			config:  defaultTestBackendConfig(),
+			wantErr: errors.New("missing jwt"),
+		},
+		"sa_token": {
+			role: "plugin-test",
+			jwt:  jwtData,
+			config: &testBackendConfig{
+				pems:            testDefaultPEMs,
+				saName:          testName,
+				saNamespace:     testNamespace,
+				aliasNameSource: aliasNameSourceSAToken,
+			},
+			expectedAliasName: testUID,
+		},
+		"sa_path": {
+			role: "plugin-test",
+			jwt:  jwtData,
+			config: &testBackendConfig{
+				pems:            testDefaultPEMs,
+				saName:          testName,
+				saNamespace:     testNamespace,
+				aliasNameSource: aliasNameSourceSAPath,
+			},
+			expectedAliasName: fmt.Sprintf("%s/%s", testNamespace, testName),
 		},
 	}
 
-	resp, err := b.HandleRequest(context.Background(), req)
-	if err != nil || (resp != nil && resp.IsError()) {
-		t.Fatalf("err:%s resp:%#v\n", err, resp)
-	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			b, storage := setupBackend(t, tc.config)
 
-	if resp.Auth.Alias.Name != testUID {
-		t.Fatalf("Unexpected UID: %s", resp.Auth.Alias.Name)
+			req := &logical.Request{
+				Operation: logical.AliasLookaheadOperation,
+				Path:      "login",
+				Storage:   storage,
+				Data: map[string]interface{}{
+					"jwt":  tc.jwt,
+					"role": tc.role,
+				},
+				Connection: &logical.Connection{
+					RemoteAddr: "127.0.0.1",
+				},
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			if tc.wantErr != nil {
+				var actual error
+				if err != nil {
+					actual = err
+				} else if resp != nil && resp.IsError() {
+					actual = resp.Error()
+				} else {
+					t.Fatalf("no error found")
+				}
+
+				if tc.wantErr.Error() != actual.Error() {
+					t.Fatalf("expected err %q, actual %q", tc.wantErr, actual)
+				}
+			} else {
+				if err != nil || (resp != nil && resp.IsError()) {
+					t.Fatalf("err:%s resp:%#v\n", err, resp)
+				}
+
+				if resp.Auth.Alias.Name != tc.expectedAliasName {
+					t.Fatalf("expected Alias.Name %s, actual %s", tc.expectedAliasName, resp.Auth.Alias.Name)
+				}
+			}
+		})
 	}
 }
 
