@@ -659,7 +659,7 @@ func TestAliasLookAhead(t *testing.T) {
 				} else if resp != nil && resp.IsError() {
 					actual = resp.Error()
 				} else {
-					t.Fatalf("no error found")
+					t.Fatalf("expected error")
 				}
 
 				if tc.wantErr.Error() != actual.Error() {
