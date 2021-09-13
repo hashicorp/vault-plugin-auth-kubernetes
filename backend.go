@@ -23,12 +23,8 @@ const (
 )
 
 var (
-	aliasNameSources = []string{aliasNameSourceSAToken, aliasNameSourceSAPath}
-	// map alias name source to its description
-	aliasNameSourceMap = map[string]string{
-		aliasNameSourceSAToken: "format: <token.uid>",
-		aliasNameSourceSAPath:  "format: <namespace>/<serviceaccount>",
-	}
+	// when adding new alias name sources make sure to update the corresponding FieldSchema description in path_role.go
+	aliasNameSources          = []string{aliasNameSourceSAToken, aliasNameSourceSAPath}
 	errInvalidAliasNameSource = fmt.Errorf(`invalid alias_name_source, must be one of: %s`, strings.Join(aliasNameSources, ", "))
 )
 
@@ -155,18 +151,6 @@ func validateAliasNameSource(source string) error {
 		}
 	}
 	return errInvalidAliasNameSource
-}
-
-func getAliasNameSourceDesc() string {
-	var desc = make([]string, len(aliasNameSources))
-	for i, s := range aliasNameSources {
-		d := aliasNameSourceMap[s]
-		if s == aliasNameSourceDefault {
-			d = d + " [default]"
-		}
-		desc[i] = fmt.Sprintf("%q (%s)", s, d)
-	}
-	return strings.Join(desc, ", ")
 }
 
 var backendHelp string = `

@@ -50,9 +50,14 @@ are allowed.`,
 					Description: "Optional Audience claim to verify in the jwt.",
 				},
 				"alias_name_source": {
-					Type:        framework.TypeString,
-					Description: fmt.Sprintf(`Source to use when deriving the Alias' name, valid choices: %s`, getAliasNameSourceDesc()),
-					Default:     aliasNameSourceDefault,
+					Type: framework.TypeString,
+					Description: fmt.Sprintf(`Source to use when deriving the Alias name.
+valid choices:
+	%q : <token.uid> e.g. 474b11b5-0f20-4f9d-8ca5-65715ab325e0 (most secure choice)
+	%q : <namespace>/<serviceaccount> e.g. vault/vault-agent
+default: %q
+`, aliasNameSourceSAToken, aliasNameSourceSAPath, aliasNameSourceDefault),
+					Default: aliasNameSourceDefault,
 				},
 				"policies": {
 					Type:        framework.TypeCommaStringSlice,
