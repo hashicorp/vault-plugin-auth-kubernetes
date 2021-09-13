@@ -283,11 +283,11 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	}
 	// Verify names was not empty
 	if len(role.ServiceAccountNames) == 0 {
-		return logical.ErrorResponse("\"bound_service_account_names\" can not be empty"), nil
+		return logical.ErrorResponse("%q can not be empty", "bound_service_account_names"), nil
 	}
 	// Verify * was not set with other data
 	if len(role.ServiceAccountNames) > 1 && strutil.StrListContains(role.ServiceAccountNames, "*") {
-		return logical.ErrorResponse("can not mix \"*\" with values"), nil
+		return logical.ErrorResponse("can not mix %q with values", "*"), nil
 	}
 
 	if namespaces, ok := data.GetOk("bound_service_account_namespaces"); ok {
@@ -297,11 +297,11 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	}
 	// Verify namespaces is not empty
 	if len(role.ServiceAccountNamespaces) == 0 {
-		return logical.ErrorResponse("\"bound_service_account_namespaces\" can not be empty"), nil
+		return logical.ErrorResponse("%q can not be empty", "bound_service_account_namespaces"), nil
 	}
 	// Verify * was not set with other data
 	if len(role.ServiceAccountNamespaces) > 1 && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
-		return logical.ErrorResponse("can not mix \"*\" with values"), nil
+		return logical.ErrorResponse("can not mix %q with values", "*"), nil
 	}
 
 	// optional audience field

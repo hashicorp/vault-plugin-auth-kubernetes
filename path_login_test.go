@@ -154,7 +154,7 @@ func TestLogin(t *testing.T) {
 	if resp == nil || !resp.IsError() {
 		t.Fatal("expected error")
 	}
-	if resp.Error().Error() != "invalid role name \"plugin-test-bad\"" {
+	if resp.Error().Error() != `invalid role name "plugin-test-bad"` {
 		t.Fatalf("unexpected error: %s", resp.Error())
 	}
 
@@ -462,7 +462,7 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 	if resp == nil || !resp.IsError() {
 		t.Fatal("expected error")
 	}
-	if resp.Error().Error() != "invalid role name \"plugin-test-bad\"" {
+	if resp.Error().Error() != `invalid role name "plugin-test-bad"` {
 		t.Fatalf("unexpected error: %s", resp.Error())
 	}
 
@@ -799,7 +799,7 @@ func TestLoginIssValidation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if err.Error() != "claim \"iss\" is invalid" {
+	if err.Error() != `claim "iss" is invalid` {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
@@ -887,7 +887,7 @@ func TestLoginProjectedToken(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	var roleNameError = fmt.Errorf("invalid role name \"%s\"", "plugin-test-x")
+	var roleNameError = fmt.Errorf("invalid role name %q", "plugin-test-x")
 
 	testCases := map[string]struct {
 		role        string
