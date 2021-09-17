@@ -610,14 +610,14 @@ func TestAliasLookAhead(t *testing.T) {
 			config:  defaultTestBackendConfig(),
 			wantErr: errors.New("missing jwt"),
 		},
-		"sa_token": {
+		"sa_uid": {
 			role: "plugin-test",
 			jwt:  jwtData,
 			config: &testBackendConfig{
 				pems:            testDefaultPEMs,
 				saName:          testName,
 				saNamespace:     testNamespace,
-				aliasNameSource: aliasNameSourceSAToken,
+				aliasNameSource: aliasNameSourceSAUid,
 			},
 			expectedAliasName: testUID,
 		},

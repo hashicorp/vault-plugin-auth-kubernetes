@@ -156,7 +156,7 @@ func (b *kubeAuthBackend) getFieldValueStr(data *framework.FieldData, param stri
 
 func (b *kubeAuthBackend) getAliasName(role *roleStorageEntry, serviceAccount *serviceAccount) (string, error) {
 	switch role.AliasNameSource {
-	case aliasNameSourceSAToken, aliasNameSourceUnset:
+	case aliasNameSourceSAUid, aliasNameSourceUnset:
 		uid, err := serviceAccount.uid()
 		if err != nil {
 			return "", err
