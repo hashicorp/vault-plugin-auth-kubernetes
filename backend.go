@@ -17,8 +17,8 @@ const (
 
 	// aliasNameSourceUnset provides backwards compatibility with preexisting roles.
 	aliasNameSourceUnset   = ""
-	aliasNameSourceSAUid   = "sa_uid"
-	aliasNameSourceSAPath  = "sa_path"
+	aliasNameSourceSAUid   = "serviceaccount_uid"
+	aliasNameSourceSAPath  = "serviceaccount_path"
 	aliasNameSourceDefault = aliasNameSourceSAUid
 )
 

@@ -73,7 +73,7 @@ func TestPath_Create(t *testing.T) {
 				AliasNameSource:          aliasNameSourceDefault,
 			},
 		},
-		"alias_name_source_sa_path": {
+		"alias_name_source_serviceaccount_path": {
 			data: map[string]interface{}{
 				"bound_service_account_names":      "name",
 				"bound_service_account_namespaces": "namespace",

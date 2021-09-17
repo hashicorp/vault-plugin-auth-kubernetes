@@ -610,7 +610,7 @@ func TestAliasLookAhead(t *testing.T) {
 			config:  defaultTestBackendConfig(),
 			wantErr: errors.New("missing jwt"),
 		},
-		"sa_uid": {
+		"serviceaccount_uid": {
 			role: "plugin-test",
 			jwt:  jwtData,
 			config: &testBackendConfig{
@@ -621,7 +621,7 @@ func TestAliasLookAhead(t *testing.T) {
 			},
 			expectedAliasName: testUID,
 		},
-		"sa_path": {
+		"serviceaccount_path": {
 			role: "plugin-test",
 			jwt:  jwtData,
 			config: &testBackendConfig{
