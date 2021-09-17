@@ -162,7 +162,7 @@ func (b *kubeAuthBackend) getAliasName(role *roleStorageEntry, serviceAccount *s
 			return "", err
 		}
 		return uid, nil
-	case aliasNameSourceSAPath:
+	case aliasNameSourceSAName:
 		return fmt.Sprintf("%s/%s", serviceAccount.Namespace, serviceAccount.Name), nil
 	default:
 		return "", fmt.Errorf("unknown alias_name_source %q", role.AliasNameSource)

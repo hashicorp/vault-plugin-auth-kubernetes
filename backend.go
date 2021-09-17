@@ -18,13 +18,13 @@ const (
 	// aliasNameSourceUnset provides backwards compatibility with preexisting roles.
 	aliasNameSourceUnset   = ""
 	aliasNameSourceSAUid   = "serviceaccount_uid"
-	aliasNameSourceSAPath  = "serviceaccount_path"
+	aliasNameSourceSAName  = "serviceaccount_name"
 	aliasNameSourceDefault = aliasNameSourceSAUid
 )
 
 var (
 	// when adding new alias name sources make sure to update the corresponding FieldSchema description in path_role.go
-	aliasNameSources          = []string{aliasNameSourceSAUid, aliasNameSourceSAPath}
+	aliasNameSources          = []string{aliasNameSourceSAUid, aliasNameSourceSAName}
 	errInvalidAliasNameSource = fmt.Errorf(`invalid alias_name_source, must be one of: %s`, strings.Join(aliasNameSources, ", "))
 )
 
