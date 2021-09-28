@@ -5,7 +5,7 @@ EXTERNAL_TOOLS=\
 	github.com/mitchellh/gox \
 	github.com/golang/dep/cmd/dep
 BUILD_TAGS?=${TOOL}
-GOFMT_FILES?=$$(find . -name '*.go' | grep -v vendor)
+GOFMT_FILES?=$$(find . -name '*.go')
 
 # bin generates the releaseable binaries for this plugin
 bin: fmtcheck generate
