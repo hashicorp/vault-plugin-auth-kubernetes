@@ -168,6 +168,7 @@ func (b *kubeAuthBackend) getAliasName(role *roleStorageEntry, serviceAccount *s
 
 // aliasLookahead returns the alias object with the SA UID from the JWT
 // Claims.
+// Only JWTs matching the specified role's configuration will be accepted as valid.
 func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName, resp := b.getFieldValueStr(data, "role")
 	if resp != nil {
@@ -192,6 +193,8 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 		return nil, err
 	}
 
+	// validation of the JWT against the provided role ensures alias look ahead requests
+	// are authentic.
 	sa, err := b.parseAndValidateJWT(jwtStr, role, config)
 	if err != nil {
 		return nil, err
