@@ -57,14 +57,14 @@ func pathLogin(b *kubeAuthBackend) *framework.Path {
 
 // pathLogin is used to authenticate to this backend
 func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleName := data.Get("role").(string)
-	if len(roleName) == 0 {
-		return logical.ErrorResponse("missing role"), nil
+	roleName, resp := b.getFieldValueStr(data, "role")
+	if resp != nil {
+		return resp, nil
 	}
 
-	jwtStr := data.Get("jwt").(string)
-	if len(jwtStr) == 0 {
-		return logical.ErrorResponse("missing jwt"), nil
+	jwtStr, resp := b.getFieldValueStr(data, "jwt")
+	if resp != nil {
+		return resp, nil
 	}
 
 	b.l.RLock()
@@ -75,7 +75,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 	if role == nil {
-		return logical.ErrorResponse(fmt.Sprintf("invalid role name \"%s\"", roleName)), nil
+		return logical.ErrorResponse(fmt.Sprintf("invalid role name %q", roleName)), nil
 	}
 
 	// Check for a CIDR match.
@@ -89,15 +89,17 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		}
 	}
 
-	config, err := b.config(ctx, req.Storage)
+	config, err := b.loadConfig(ctx, req.Storage)
 	if err != nil {
 		return nil, err
 	}
-	if config == nil {
-		return nil, errors.New("could not load backend configuration")
-	}
 
 	serviceAccount, err := b.parseAndValidateJWT(jwtStr, role, config)
+	if err != nil {
+		return nil, err
+	}
+
+	aliasName, err := serviceAccount.uid()
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +111,15 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrPermissionDenied
 	}
 
+	uid, err := serviceAccount.uid()
+	if err != nil {
+		return nil, err
+	}
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
-			Name: serviceAccount.uid(),
+			Name: aliasName,
 			Metadata: map[string]string{
-				"service_account_uid":         serviceAccount.uid(),
+				"service_account_uid":         uid,
 				"service_account_name":        serviceAccount.name(),
 				"service_account_namespace":   serviceAccount.namespace(),
 				"service_account_secret_name": serviceAccount.SecretName,
@@ -123,7 +129,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 			"role": roleName,
 		},
 		Metadata: map[string]string{
-			"service_account_uid":         serviceAccount.uid(),
+			"service_account_uid":         uid,
 			"service_account_name":        serviceAccount.name(),
 			"service_account_namespace":   serviceAccount.namespace(),
 			"service_account_secret_name": serviceAccount.SecretName,
@@ -139,29 +145,57 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	}, nil
 }
 
+func (b *kubeAuthBackend) getFieldValueStr(data *framework.FieldData, param string) (string, *logical.Response) {
+	val := data.Get(param).(string)
+	if len(val) == 0 {
+		return "", logical.ErrorResponse("missing %s", param)
+	}
+	return val, nil
+}
+
 // aliasLookahead returns the alias object with the SA UID from the JWT
 // Claims.
+// Only JWTs matching the specified role's configuration will be accepted as valid.
 func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	jwtStr := data.Get("jwt").(string)
-	if len(jwtStr) == 0 {
-		return logical.ErrorResponse("missing jwt"), nil
+	roleName, resp := b.getFieldValueStr(data, "role")
+	if resp != nil {
+		return resp, nil
 	}
 
-	// Parse into JWT
-	parsedJWT, err := jws.ParseJWT([]byte(jwtStr))
+	jwtStr, resp := b.getFieldValueStr(data, "jwt")
+	if resp != nil {
+		return resp, nil
+	}
+
+	role, err := b.role(ctx, req.Storage, roleName)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return logical.ErrorResponse(fmt.Sprintf("invalid role name %q", roleName)), nil
+	}
+
+	config, err := b.loadConfig(ctx, req.Storage)
 	if err != nil {
 		return nil, err
 	}
 
-	saUID, ok := parsedJWT.Claims().Get(uidJWTClaimKey).(string)
-	if !ok || saUID == "" {
-		return nil, errors.New("could not parse UID from claims")
+	// validation of the JWT against the provided role ensures alias look ahead requests
+	// are authentic.
+	sa, err := b.parseAndValidateJWT(jwtStr, role, config)
+	if err != nil {
+		return nil, err
+	}
+
+	aliasName, err := sa.uid()
+	if err != nil {
+		return nil, err
 	}
 
 	return &logical.Response{
 		Auth: &logical.Auth{
 			Alias: &logical.Alias{
-				Name: saUID,
+				Name: aliasName,
 			},
 		},
 	}, nil
@@ -311,11 +345,17 @@ type serviceAccount struct {
 
 // uid returns the UID for the service account, preferring the projected service
 // account value if found
-func (s *serviceAccount) uid() string {
+// return an error when the UID is empty.
+func (s *serviceAccount) uid() (string, error) {
+	uid := s.UID
 	if s.Kubernetes != nil && s.Kubernetes.ServiceAccount != nil {
-		return s.Kubernetes.ServiceAccount.UID
+		uid = s.Kubernetes.ServiceAccount.UID
 	}
-	return s.UID
+
+	if uid == "" {
+		return "", errors.New("could not parse UID from claims")
+	}
+	return uid, nil
 }
 
 // name returns the name for the service account, preferring the projected
@@ -361,7 +401,11 @@ func (s *serviceAccount) lookup(ctx context.Context, jwtStr string, tr tokenRevi
 	if s.name() != r.Name {
 		return errors.New("JWT names did not match")
 	}
-	if s.uid() != r.UID {
+	uid, err := s.uid()
+	if err != nil {
+		return err
+	}
+	if uid != r.UID {
 		return errors.New("JWT UIDs did not match")
 	}
 	if s.namespace() != r.Namespace {
