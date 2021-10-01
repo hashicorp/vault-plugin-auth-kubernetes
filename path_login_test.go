@@ -31,18 +31,26 @@ var (
 	testNoPEMs      = []string{testECCert, testRSACert}
 )
 
-func setupBackend(t *testing.T, pems []string, saName string, saNamespace string) (logical.Backend, logical.Storage) {
-	b, storage := getBackend(t)
+type testBackendConfig struct {
+	pems        []string
+	saName      string
+	saNamespace string
+}
 
-	// pems := []string{testECCert, testRSACert, testMinikubePubKey}
-	// pems := []string{testECCert, testRSACert}
-	// if noPEMs {
-	// 	pems = []string{}
-	// }
+func defaultTestBackendConfig() *testBackendConfig {
+	return &testBackendConfig{
+		pems:        testDefaultPEMs,
+		saName:      testName,
+		saNamespace: testNamespace,
+	}
+}
+
+func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, logical.Storage) {
+	b, storage := getBackend(t)
 
 	// test no certificate
 	data := map[string]interface{}{
-		"pem_keys":           pems,
+		"pem_keys":           config.pems,
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
 	}
@@ -60,8 +68,8 @@ func setupBackend(t *testing.T, pems []string, saName string, saNamespace string
 	}
 
 	data = map[string]interface{}{
-		"bound_service_account_names":      saName,
-		"bound_service_account_namespaces": saNamespace,
+		"bound_service_account_names":      config.saName,
+		"bound_service_account_namespaces": config.saNamespace,
 		"policies":                         "test",
 		"period":                           "3s",
 		"ttl":                              "1s",
@@ -86,7 +94,7 @@ func setupBackend(t *testing.T, pems []string, saName string, saNamespace string
 }
 
 func TestLogin(t *testing.T) {
-	b, storage := setupBackend(t, testDefaultPEMs, testName, testNamespace)
+	b, storage := setupBackend(t, defaultTestBackendConfig())
 
 	// Test bad inputs
 	data := map[string]interface{}{
@@ -143,7 +151,7 @@ func TestLogin(t *testing.T) {
 	if resp == nil || !resp.IsError() {
 		t.Fatal("expected error")
 	}
-	if resp.Error().Error() != "invalid role name \"plugin-test-bad\"" {
+	if resp.Error().Error() != `invalid role name "plugin-test-bad"` {
 		t.Fatalf("unexpected error: %s", resp.Error())
 	}
 
@@ -217,7 +225,9 @@ func TestLogin(t *testing.T) {
 	}
 
 	// test successful login for globbed name
-	b, storage = setupBackend(t, testDefaultPEMs, testGlobbedName, testNamespace)
+	config := defaultTestBackendConfig()
+	config.saName = testGlobbedName
+	b, storage = setupBackend(t, config)
 
 	data = map[string]interface{}{
 		"role": "plugin-test",
@@ -240,7 +250,9 @@ func TestLogin(t *testing.T) {
 	}
 
 	// test successful login for globbed namespace
-	b, storage = setupBackend(t, testDefaultPEMs, testName, testGlobbedNamespace)
+	config = defaultTestBackendConfig()
+	config.saNamespace = testGlobbedNamespace
+	b, storage = setupBackend(t, config)
 
 	data = map[string]interface{}{
 		"role": "plugin-test",
@@ -264,7 +276,7 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogin_ContextError(t *testing.T) {
-	b, storage := setupBackend(t, testDefaultPEMs, testName, testNamespace)
+	b, storage := setupBackend(t, defaultTestBackendConfig())
 
 	data := map[string]interface{}{
 		"role": "plugin-test",
@@ -291,7 +303,9 @@ func TestLogin_ContextError(t *testing.T) {
 }
 
 func TestLogin_ECDSA_PEM(t *testing.T) {
-	b, storage := setupBackend(t, testNoPEMs, testName, testNamespace)
+	config := defaultTestBackendConfig()
+	config.pems = testNoPEMs
+	b, storage := setupBackend(t, config)
 
 	// test no certificate
 	data := map[string]interface{}{
@@ -335,7 +349,9 @@ func TestLogin_ECDSA_PEM(t *testing.T) {
 }
 
 func TestLogin_NoPEMs(t *testing.T) {
-	b, storage := setupBackend(t, testNoPEMs, testName, testNamespace)
+	config := defaultTestBackendConfig()
+	config.pems = testNoPEMs
+	b, storage := setupBackend(t, config)
 
 	// test bad jwt service account
 	data := map[string]interface{}{
@@ -383,7 +399,10 @@ func TestLogin_NoPEMs(t *testing.T) {
 }
 
 func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
-	b, storage := setupBackend(t, testDefaultPEMs, "*", "*")
+	config := defaultTestBackendConfig()
+	config.saName = "*"
+	config.saNamespace = "*"
+	b, storage := setupBackend(t, config)
 
 	// Test bad inputs
 	data := map[string]interface{}{
@@ -440,7 +459,7 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 	if resp == nil || !resp.IsError() {
 		t.Fatal("expected error")
 	}
-	if resp.Error().Error() != "invalid role name \"plugin-test-bad\"" {
+	if resp.Error().Error() != `invalid role name "plugin-test-bad"` {
 		t.Fatalf("unexpected error: %s", resp.Error())
 	}
 
@@ -514,7 +533,9 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 	}
 
 	// test successful login for globbed name
-	b, storage = setupBackend(t, testDefaultPEMs, testGlobbedName, testNamespace)
+	config = defaultTestBackendConfig()
+	config.saName = testGlobbedName
+	b, storage = setupBackend(t, config)
 
 	data = map[string]interface{}{
 		"role": "plugin-test",
@@ -537,7 +558,9 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 	}
 
 	// test successful login for globbed namespace
-	b, storage = setupBackend(t, testDefaultPEMs, testName, testGlobbedNamespace)
+	config = defaultTestBackendConfig()
+	config.saNamespace = testGlobbedNamespace
+	b, storage = setupBackend(t, config)
 
 	data = map[string]interface{}{
 		"role": "plugin-test",
@@ -561,35 +584,79 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 }
 
 func TestAliasLookAhead(t *testing.T) {
-	b, storage := setupBackend(t, testDefaultPEMs, testName, testNamespace)
-
-	// Test bad inputs
-	data := map[string]interface{}{
-		"jwt": jwtData,
-	}
-
-	req := &logical.Request{
-		Operation: logical.AliasLookaheadOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
-		Connection: &logical.Connection{
-			RemoteAddr: "127.0.0.1",
+	testCases := map[string]struct {
+		role    string
+		jwt     string
+		config  *testBackendConfig
+		wantErr error
+	}{
+		"default": {
+			role:   "plugin-test",
+			jwt:    jwtData,
+			config: defaultTestBackendConfig(),
+		},
+		"no_role": {
+			jwt:     jwtData,
+			config:  defaultTestBackendConfig(),
+			wantErr: errors.New("missing role"),
+		},
+		"no_jwt": {
+			role:    "plugin-test",
+			config:  defaultTestBackendConfig(),
+			wantErr: errors.New("missing jwt"),
+		},
+		"invalid_jwt": {
+			role:    "plugin-test",
+			config:  defaultTestBackendConfig(),
+			jwt:     jwtBadServiceAccount,
+			wantErr: errors.New("service account name not authorized"),
 		},
 	}
 
-	resp, err := b.HandleRequest(context.Background(), req)
-	if err != nil || (resp != nil && resp.IsError()) {
-		t.Fatalf("err:%s resp:%#v\n", err, resp)
-	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			b, storage := setupBackend(t, tc.config)
 
-	if resp.Auth.Alias.Name != testUID {
-		t.Fatalf("Unexpected UID: %s", resp.Auth.Alias.Name)
+			req := &logical.Request{
+				Operation: logical.AliasLookaheadOperation,
+				Path:      "login",
+				Storage:   storage,
+				Data: map[string]interface{}{
+					"jwt":  tc.jwt,
+					"role": tc.role,
+				},
+				Connection: &logical.Connection{
+					RemoteAddr: "127.0.0.1",
+				},
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			if tc.wantErr != nil {
+				var actual error
+				if err != nil {
+					actual = err
+				} else if resp != nil && resp.IsError() {
+					actual = resp.Error()
+				} else {
+					t.Fatalf("expected error")
+				}
+
+				if tc.wantErr.Error() != actual.Error() {
+					t.Fatalf("expected err %q, actual %q", tc.wantErr, actual)
+				}
+			} else {
+				if err != nil || (resp != nil && resp.IsError()) {
+					t.Fatalf("err:%s resp:%#v\n", err, resp)
+				}
+			}
+		})
 	}
 }
 
 func TestLoginIssValidation(t *testing.T) {
-	b, storage := setupBackend(t, testNoPEMs, testName, testNamespace)
+	config := defaultTestBackendConfig()
+	config.pems = testNoPEMs
+	b, storage := setupBackend(t, config)
 
 	// test iss validation enabled with default "kubernetes/serviceaccount" issuer
 	data := map[string]interface{}{
@@ -707,7 +774,7 @@ func TestLoginIssValidation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if err.Error() != "claim \"iss\" is invalid" {
+	if err.Error() != `claim "iss" is invalid` {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
@@ -768,7 +835,9 @@ Pk9Yf9rIf374m5XP1U8q79dBhLSIuaojsvOT39UUcPJROSD1FqYLued0rXiooIii
 -----END PUBLIC KEY-----`
 
 func TestLoginProjectedToken(t *testing.T) {
-	b, storage := setupBackend(t, append(testDefaultPEMs, testMinikubePubKey), testName, testNamespace)
+	config := defaultTestBackendConfig()
+	config.pems = append(testDefaultPEMs, testMinikubePubKey)
+	b, storage := setupBackend(t, config)
 
 	// update backend to accept "default" bound account name
 	data := map[string]interface{}{
@@ -793,7 +862,7 @@ func TestLoginProjectedToken(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	var roleNameError = fmt.Errorf("invalid role name \"%s\"", "plugin-test-x")
+	var roleNameError = fmt.Errorf("invalid role name %q", "plugin-test-x")
 
 	testCases := map[string]struct {
 		role        string
