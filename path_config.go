@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 
 	"github.com/briankassouf/jose/jws"
 	"github.com/hashicorp/vault/sdk/framework"
@@ -122,34 +121,31 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	}
 
 	disableLocalJWT := data.Get("disable_local_ca_jwt").(bool)
-	localCACert := []byte{}
-	localTokenReviewer := []byte{}
-	if !disableLocalJWT {
-		localCACert, _ = ioutil.ReadFile(localCACertPath)
-		localTokenReviewer, _ = ioutil.ReadFile(localJWTPath)
-	}
 	pemList := data.Get("pem_keys").([]string)
 	caCert := data.Get("kubernetes_ca_cert").(string)
 	issuer := data.Get("issuer").(string)
 	disableIssValidation := data.Get("disable_iss_validation").(bool)
-	if len(pemList) == 0 && len(caCert) == 0 {
-		if len(localCACert) > 0 {
-			caCert = string(localCACert)
-		} else {
-			return logical.ErrorResponse("one of pem_keys or kubernetes_ca_cert must be set"), nil
-		}
-	}
-
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
-	if !disableLocalJWT && len(tokenReviewer) == 0 && len(localTokenReviewer) > 0 {
-		tokenReviewer = string(localTokenReviewer)
-	}
 
-	if len(tokenReviewer) > 0 {
-		// Validate it's a JWT
-		_, err := jws.ParseJWT([]byte(tokenReviewer))
+	if disableLocalJWT {
+		if len(tokenReviewer) > 0 {
+			// Validate it's a JWT
+			_, err := jws.ParseJWT([]byte(tokenReviewer))
+			if err != nil {
+				return nil, err
+			}
+		}
+		if len(caCert) == 0 {
+			return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
+		}
+	} else if len(tokenReviewer) == 0 || len(caCert) == 0 {
+		// User did not provide token or CA certificate:
+		// load local token and CA cert into memory but do not store them persistently.
+		b.l.Lock()
+		defer b.l.Unlock()
+		err := b.loadLocalFiles()
 		if err != nil {
-			return nil, err
+			return logical.ErrorResponse(err.Error()), nil
 		}
 	}
 

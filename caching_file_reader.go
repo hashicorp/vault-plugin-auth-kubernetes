@@ -1,0 +1,64 @@
+package kubeauth
+
+import (
+	"io/ioutil"
+	"sync"
+	"time"
+)
+
+// cachingFileReader reads a file and keeps an in-memory copy of it, until the
+// copy is considered stale. Next ReadFile() after expiry will re-read the file from disk.
+type cachingFileReader struct {
+	// path is the file path to the cached file.
+	path string
+
+	// ttl is the time-to-live duration when cached file is considered stale
+	ttl time.Duration
+
+	// cache is the buffer holding the in-memory copy of the file.
+	cache *cachedFile
+
+	l sync.RWMutex
+}
+
+type cachedFile struct {
+	// buf is the buffer holding the in-memory copy of the file.
+	buf string
+
+	// expiry is the time when the cached copy is considered stale and must be re-read.
+	expiry time.Time
+}
+
+func newCachingFileReader(path string, ttl time.Duration) *cachingFileReader {
+	return &cachingFileReader{
+		path: path,
+		ttl:  ttl,
+	}
+}
+
+func (r *cachingFileReader) ReadFile() (string, error) {
+	// Fast path requiring read lock only: file is already in memory and not stale.
+	now := time.Now()
+	r.l.RLock()
+	cache := r.cache
+	r.l.RUnlock()
+
+	if cache != nil && now.Before(cache.expiry) {
+		return cache.buf, nil
+	}
+
+	// Slow path: read the file from disk.
+	r.l.Lock()
+	defer r.l.Unlock()
+
+	buf, err := ioutil.ReadFile(r.path)
+	if err != nil {
+		return "", err
+	}
+	r.cache = &cachedFile{
+		buf:    string(buf),
+		expiry: now.Add(r.ttl),
+	}
+
+	return r.cache.buf, nil
+}
