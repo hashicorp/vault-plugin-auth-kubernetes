@@ -205,8 +205,8 @@ func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.Initializ
 	// Check if configuration exists and load local token and CA cert files
 	// if they are used.
 	config, _ := b.config(ctx, req.Storage)
-	if config != nil && !config.DisableLocalCAJwt && (len(config.TokenReviewerJWT) == 0 || len(config.CACert) == 0) {
-		err := b.loadLocalFiles()
+	if config != nil && !config.DisableLocalCAJwt {
+		err := b.loadLocalFiles(len(config.TokenReviewerJWT) == 0, len(config.CACert) == 0)
 		if err != nil {
 			return err
 		}
@@ -214,23 +214,26 @@ func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.Initializ
 	return nil
 }
 
-// loadLocalFiles reads the local token and CA file into memory.
+// loadLocalFiles reads the local token and/or CA file into memory.
 //
 // The function should be called only in context where write lock to backend is
 // held or it is otherwise guaranteed that we can update backend object.
-func (b *kubeAuthBackend) loadLocalFiles() error {
-	b.localSATokenReader = newCachingFileReader(localJWTPath, jwtReloadPeriod)
-	_, err := b.localSATokenReader.ReadFile()
-	if err != nil {
-		return err
+func (b *kubeAuthBackend) loadLocalFiles(loadJWT, loadCACert bool) error {
+	if loadJWT {
+		b.localSATokenReader = newCachingFileReader(localJWTPath, jwtReloadPeriod)
+		_, err := b.localSATokenReader.ReadFile()
+		if err != nil {
+			return err
+		}
 	}
 
-	buf, err := ioutil.ReadFile(localCACertPath)
-	if err != nil {
-		return err
+	if loadCACert {
+		buf, err := ioutil.ReadFile(localCACertPath)
+		if err != nil {
+			return err
+		}
+		b.localCACert = string(buf)
 	}
-	b.localCACert = string(buf)
-
 	return nil
 }
 

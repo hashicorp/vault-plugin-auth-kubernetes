@@ -140,10 +140,10 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		}
 	} else if len(tokenReviewer) == 0 || len(caCert) == 0 {
 		// User did not provide token or CA certificate:
-		// load local token and CA cert into memory but do not store them persistently.
+		// load local token and/or CA cert into memory but do not store them persistently.
 		b.l.Lock()
 		defer b.l.Unlock()
-		err := b.loadLocalFiles()
+		err := b.loadLocalFiles(len(tokenReviewer) == 0, len(caCert) == 0)
 		if err != nil {
 			return logical.ErrorResponse(err.Error()), nil
 		}
