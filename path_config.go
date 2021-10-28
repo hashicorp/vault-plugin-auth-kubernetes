@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io/ioutil"
 
-	"github.com/briankassouf/jose/jws"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -29,21 +28,11 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 				Type:        framework.TypeString,
 				Description: "Host must be a host string, a host:port pair, or a URL to the base of the Kubernetes API server.",
 			},
-
 			"kubernetes_ca_cert": {
 				Type:        framework.TypeString,
 				Description: "PEM encoded CA cert for use by the TLS client used to talk with the API.",
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Kubernetes CA Certificate",
-				},
-			},
-			"token_reviewer_jwt": {
-				Type: framework.TypeString,
-				Description: `A service account JWT used to access the
-TokenReview API to validate other JWTs during login. If not set
-the JWT used for login will be used to access the API.`,
-				DisplayAttrs: &framework.DisplayAttributes{
-					Name: "Token Reviewer JWT",
 				},
 			},
 			"pem_keys": {
@@ -91,7 +80,7 @@ extracted. Not every installation of Kubernetes exposes these keys.`,
 	}
 }
 
-// pathConfigWrite handles create and update commands to the config
+// pathConfigRead handles read commands of the config
 func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	if config, err := b.config(ctx, req.Storage); err != nil {
 		return nil, err
@@ -123,10 +112,8 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 
 	disableLocalJWT := data.Get("disable_local_ca_jwt").(bool)
 	localCACert := []byte{}
-	localTokenReviewer := []byte{}
 	if !disableLocalJWT {
 		localCACert, _ = ioutil.ReadFile(localCACertPath)
-		localTokenReviewer, _ = ioutil.ReadFile(localJWTPath)
 	}
 	pemList := data.Get("pem_keys").([]string)
 	caCert := data.Get("kubernetes_ca_cert").(string)
@@ -140,25 +127,11 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		}
 	}
 
-	tokenReviewer := data.Get("token_reviewer_jwt").(string)
-	if !disableLocalJWT && len(tokenReviewer) == 0 && len(localTokenReviewer) > 0 {
-		tokenReviewer = string(localTokenReviewer)
-	}
-
-	if len(tokenReviewer) > 0 {
-		// Validate it's a JWT
-		_, err := jws.ParseJWT([]byte(tokenReviewer))
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	config := &kubeConfig{
 		PublicKeys:           make([]interface{}, len(pemList)),
 		PEMKeys:              pemList,
 		Host:                 host,
 		CACert:               caCert,
-		TokenReviewerJWT:     tokenReviewer,
 		Issuer:               issuer,
 		DisableISSValidation: disableIssValidation,
 		DisableLocalCAJwt:    disableLocalJWT,
@@ -195,8 +168,6 @@ type kubeConfig struct {
 	Host string `json:"host"`
 	// CACert is the CA Cert to use to call into the kubernetes API
 	CACert string `json:"ca_cert"`
-	// TokenReviewJWT is the bearer to use during the TokenReview API call
-	TokenReviewerJWT string `json:"token_reviewer_jwt"`
 	// Issuer is the claim that specifies who issued the token
 	Issuer string `json:"issuer"`
 	// DisableISSValidation is optional parameter to allow to skip ISS validation
