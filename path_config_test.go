@@ -143,7 +143,7 @@ func TestConfig(t *testing.T) {
 		PEMKeys:              []string{},
 		Host:                 "host",
 		CACert:               testCACert,
-		DisableISSValidation: false,
+		DisableISSValidation: true,
 	}
 
 	conf, err := b.(*kubeAuthBackend).config(context.Background(), storage)
@@ -184,7 +184,7 @@ func TestConfig(t *testing.T) {
 		PEMKeys:              []string{},
 		Host:                 "host",
 		CACert:               testCACert,
-		DisableISSValidation: false,
+		DisableISSValidation: true,
 		DisableLocalCAJwt:    false,
 	}
 
@@ -226,7 +226,7 @@ func TestConfig(t *testing.T) {
 		PEMKeys:              []string{testRSACert},
 		Host:                 "host",
 		CACert:               testCACert,
-		DisableISSValidation: false,
+		DisableISSValidation: true,
 		DisableLocalCAJwt:    false,
 	}
 
@@ -273,7 +273,7 @@ func TestConfig(t *testing.T) {
 		PEMKeys:              []string{testRSACert, testECCert},
 		Host:                 "host",
 		CACert:               testCACert,
-		DisableISSValidation: false,
+		DisableISSValidation: true,
 		DisableLocalCAJwt:    false,
 	}
 
@@ -353,7 +353,7 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				PEMKeys:              []string{},
 				Host:                 "host",
 				CACert:               testLocalCACert,
-				DisableISSValidation: false,
+				DisableISSValidation: true,
 				DisableLocalCAJwt:    false,
 			},
 		},
@@ -367,7 +367,7 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				PEMKeys:              []string{},
 				Host:                 "host",
 				CACert:               testCACert,
-				DisableISSValidation: false,
+				DisableISSValidation: true,
 				DisableLocalCAJwt:    false,
 			},
 		},
@@ -381,7 +381,7 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				PEMKeys:              []string{},
 				Host:                 "host",
 				CACert:               testLocalCACert,
-				DisableISSValidation: false,
+				DisableISSValidation: true,
 				DisableLocalCAJwt:    false,
 			},
 		},
@@ -396,7 +396,7 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				PEMKeys:              []string{},
 				Host:                 "host",
 				CACert:               testCACert,
-				DisableISSValidation: false,
+				DisableISSValidation: true,
 				DisableLocalCAJwt:    true,
 			},
 		},
