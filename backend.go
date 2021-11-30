@@ -33,13 +33,10 @@ var (
 	// jwtReloadPeriod is the time period how often the in-memory copy of local
 	// service account token can be used, before reading it again from disk.
 	//
-	// Background for the selected value:
-	// Service account token expiration time is configurable by Kubernetes API
-	// server parameter service-account-max-token-expiration. The token is
-	// renewed when 80% of the expiration time is reached. The lowest allowed
-	// value is 1h. Reload every of 10 minutes guarantees that we will re-read
-	// the file before expiration, even if cluster uses minimum expiration time.
-	jwtReloadPeriod = 10 * time.Minute
+	// The value is selected according to recommendation in Kubernetes 1.21 changelog:
+	// "Clients should reload the token from disk periodically (once per minute
+	// is recommended) to ensure they continue to use a valid token."
+	jwtReloadPeriod = 1 * time.Minute
 )
 
 // kubeAuthBackend implements logical.Backend
