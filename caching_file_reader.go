@@ -19,6 +19,10 @@ type cachingFileReader struct {
 	cache *cachedFile
 
 	l sync.RWMutex
+
+	// currentTime is a function that returns the current local time.
+	// Normally set to time.Now but it can be overwritten by test cases to manipulate time.
+	currentTime func() time.Time
 }
 
 type cachedFile struct {
@@ -29,20 +33,20 @@ type cachedFile struct {
 	expiry time.Time
 }
 
-func newCachingFileReader(path string, ttl time.Duration) *cachingFileReader {
+func newCachingFileReader(path string, ttl time.Duration, currentTime func() time.Time) *cachingFileReader {
 	return &cachingFileReader{
-		path: path,
-		ttl:  ttl,
+		path:        path,
+		ttl:         ttl,
+		currentTime: currentTime,
 	}
 }
 
 func (r *cachingFileReader) ReadFile() (string, error) {
 	// Fast path requiring read lock only: file is already in memory and not stale.
-	now := time.Now()
 	r.l.RLock()
+	now := r.currentTime()
 	cache := r.cache
 	r.l.RUnlock()
-
 	if cache != nil && now.Before(cache.expiry) {
 		return cache.buf, nil
 	}

@@ -19,7 +19,12 @@ func TestCachingFileReader(t *testing.T) {
 	f.Close()
 	defer os.Remove(f.Name())
 
-	r := newCachingFileReader(f.Name(), 1*time.Second)
+	currentTime := time.Now()
+
+	r := newCachingFileReader(f.Name(), 1*time.Minute,
+		func() time.Time {
+			return currentTime
+		})
 
 	// Write initial content to file and check that we can read it.
 	ioutil.WriteFile(f.Name(), []byte(content1), 0644)
@@ -34,6 +39,9 @@ func TestCachingFileReader(t *testing.T) {
 	// Write new content to the file.
 	ioutil.WriteFile(f.Name(), []byte(content2), 0644)
 
+	// Advance simulated time, but not enough for cache to expire.
+	currentTime = currentTime.Add(30 * time.Second)
+
 	// Read again and check we still got the old cached content.
 	got, err = r.ReadFile()
 	if err != nil {
@@ -43,8 +51,8 @@ func TestCachingFileReader(t *testing.T) {
 		t.Errorf("got '%s', expected '%s'", got, content1)
 	}
 
-	// Wait for cache to expire.
-	time.Sleep(2 * time.Second)
+	// Advance simulated time for cache to expire.
+	currentTime = currentTime.Add(30 * time.Second)
 
 	// Read again and check that we got the new content.
 	got, err = r.ReadFile()

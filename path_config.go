@@ -7,13 +7,14 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"io/ioutil"
 
 	"github.com/briankassouf/jose/jws"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-var (
+const (
 	localCACertPath = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	localJWTPath    = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
@@ -128,25 +129,31 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
 
 	if disableLocalJWT {
-		if len(tokenReviewer) > 0 {
+		if tokenReviewer != "" {
 			// Validate it's a JWT
 			_, err := jws.ParseJWT([]byte(tokenReviewer))
 			if err != nil {
 				return nil, err
 			}
 		}
-		if len(caCert) == 0 {
+		if caCert == "" {
 			return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
 		}
-	} else if len(tokenReviewer) == 0 || len(caCert) == 0 {
-		// User did not provide token or CA certificate:
-		// load local token and/or CA cert into memory but do not store them persistently.
-		b.l.Lock()
-		defer b.l.Unlock()
-		err := b.loadLocalFiles(len(tokenReviewer) == 0, len(caCert) == 0)
-		if err != nil {
-			return logical.ErrorResponse(err.Error()), nil
+	} else {
+		// User did not provide CA certificate, check that local token is readable.
+		if caCert == "" {
+			_, err := ioutil.ReadFile(b.localCACertPath)
+			if err != nil {
+				return logical.ErrorResponse(err.Error()), nil
+			}
 		}
+
+		// We cannot check for existence of local JWT token here because:
+		// When user does not provide JWT token, we still have following options
+		//   - we might use local JWT token
+		//   - user might submit JWT in the login payload
+		// but at this point, we cannot know which one will happen.
+
 	}
 
 	config := &kubeConfig{

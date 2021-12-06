@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-func setupTestCase(t *testing.T) func() {
+func setupLocalFiles(t *testing.T, b logical.Backend) func() {
 	cert, err := ioutil.TempFile("", "ca.crt")
 	if err != nil {
 		t.Fatal(err)
@@ -25,26 +25,20 @@ func setupTestCase(t *testing.T) func() {
 	}
 	token.WriteString(testLocalJWT)
 	token.Close()
-
-	origLocalCACertPath := localCACertPath
-	origJWTPath := localJWTPath
-	localCACertPath = cert.Name()
-	localJWTPath = token.Name()
+	b.(*kubeAuthBackend).localCACertPath = cert.Name()
+	b.(*kubeAuthBackend).localJWTPath = token.Name()
 
 	return func() {
-		localCACertPath = origLocalCACertPath
-		localJWTPath = origJWTPath
 		os.Remove(cert.Name())
 		os.Remove(token.Name())
 	}
-
 }
 
 func TestConfig_Read(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	b, storage := getBackend(t)
+
+	cleanup := setupLocalFiles(t, b)
+	defer cleanup()
 
 	data := map[string]interface{}{
 		"pem_keys":               []string{testRSACert, testECCert},
@@ -85,10 +79,10 @@ func TestConfig_Read(t *testing.T) {
 }
 
 func TestConfig(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	b, storage := getBackend(t)
+
+	cleanup := setupLocalFiles(t, b)
+	defer cleanup()
 
 	// test no certificate
 	data := map[string]interface{}{
@@ -364,19 +358,16 @@ func TestConfig(t *testing.T) {
 }
 
 func TestConfig_LocalCaJWT(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
-	b, storage := getBackend(t)
-
 	testCases := map[string]struct {
-		config   map[string]interface{}
-		expected *kubeConfig
+		config              map[string]interface{}
+		setupInClusterFiles bool
+		expected            *kubeConfig
 	}{
 		"no CA or JWT, default to local": {
 			config: map[string]interface{}{
 				"kubernetes_host": "host",
 			},
+			setupInClusterFiles: true,
 			expected: &kubeConfig{
 				PublicKeys:           []interface{}{},
 				PEMKeys:              []string{},
@@ -392,6 +383,7 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				"kubernetes_host":    "host",
 				"kubernetes_ca_cert": testCACert,
 			},
+			setupInClusterFiles: true,
 			expected: &kubeConfig{
 				PublicKeys:           []interface{}{},
 				PEMKeys:              []string{},
@@ -407,6 +399,7 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				"kubernetes_host":    "host",
 				"token_reviewer_jwt": jwtData,
 			},
+			setupInClusterFiles: true,
 			expected: &kubeConfig{
 				PublicKeys:           []interface{}{},
 				PEMKeys:              []string{},
@@ -437,6 +430,13 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			b, storage := getBackend(t)
+
+			if tc.setupInClusterFiles {
+				cleanup := setupLocalFiles(t, b)
+				defer cleanup()
+			}
+
 			req := &logical.Request{
 				Operation: logical.CreateOperation,
 				Path:      configPath,
@@ -462,8 +462,10 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 }
 
 func TestConfig_LocalJWTRenewal(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
+	b, storage := getBackend(t)
+
+	cleanup := setupLocalFiles(t, b)
+	defer cleanup()
 
 	// Create temp file that will be used as token.
 	f, err := ioutil.TempFile("", "renewed-token")
@@ -473,11 +475,12 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 	f.Close()
 	defer os.Remove(f.Name())
 
-	// Make reload period bearable for a test case.
-	origJWTReloadPeriod := jwtReloadPeriod
-	jwtReloadPeriod = 1 * time.Second
+	currentTime := time.Now()
 
-	localJWTPath = f.Name()
+	b.(*kubeAuthBackend).localJWTPath = f.Name()
+	b.(*kubeAuthBackend).currentTime = func() time.Time {
+		return currentTime
+	}
 
 	token1 := "before-renewal"
 	token2 := "after-renewal"
@@ -485,7 +488,6 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 	// Write initial token to the temp file.
 	ioutil.WriteFile(f.Name(), []byte(token1), 0644)
 
-	b, storage := getBackend(t)
 	data := map[string]interface{}{
 		"kubernetes_host": "host",
 	}
@@ -525,8 +527,8 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 		t.Fatalf("got unexpected JWT: expected %#v\n got %#v\n", token1, conf.TokenReviewerJWT)
 	}
 
-	// Wait for cache to expire.
-	time.Sleep(2 * time.Second)
+	// Advance simulated time for cache to expire
+	currentTime = currentTime.Add(1 * time.Minute)
 
 	// Load again and check we the new renewed token from disk.
 	conf, err = b.(*kubeAuthBackend).loadConfig(context.Background(), storage)
@@ -538,8 +540,6 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 		t.Fatalf("got unexpected JWT: expected %#v\n got %#v\n", token2, conf.TokenReviewerJWT)
 	}
 
-	// Cleanup.
-	jwtReloadPeriod = origJWTReloadPeriod
 }
 
 var testLocalCACert string = `-----BEGIN CERTIFICATE-----

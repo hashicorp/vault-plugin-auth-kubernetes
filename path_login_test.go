@@ -97,9 +97,6 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 }
 
 func TestLogin(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	b, storage := setupBackend(t, defaultTestBackendConfig())
 
 	// Test bad inputs
@@ -282,9 +279,6 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogin_ContextError(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	b, storage := setupBackend(t, defaultTestBackendConfig())
 
 	data := map[string]interface{}{
@@ -312,9 +306,6 @@ func TestLogin_ContextError(t *testing.T) {
 }
 
 func TestLogin_ECDSA_PEM(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	config := defaultTestBackendConfig()
 	config.pems = testNoPEMs
 	b, storage := setupBackend(t, config)
@@ -361,9 +352,6 @@ func TestLogin_ECDSA_PEM(t *testing.T) {
 }
 
 func TestLogin_NoPEMs(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	config := defaultTestBackendConfig()
 	config.pems = testNoPEMs
 	b, storage := setupBackend(t, config)
@@ -414,9 +402,6 @@ func TestLogin_NoPEMs(t *testing.T) {
 }
 
 func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	config := defaultTestBackendConfig()
 	config.saName = "*"
 	config.saNamespace = "*"
@@ -602,9 +587,6 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 }
 
 func TestAliasLookAhead(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	testCases := map[string]struct {
 		role              string
 		jwt               string
@@ -703,9 +685,6 @@ func TestAliasLookAhead(t *testing.T) {
 }
 
 func TestLoginIssValidation(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	config := defaultTestBackendConfig()
 	config.pems = testNoPEMs
 	b, storage := setupBackend(t, config)
@@ -887,9 +866,6 @@ Pk9Yf9rIf374m5XP1U8q79dBhLSIuaojsvOT39UUcPJROSD1FqYLued0rXiooIii
 -----END PUBLIC KEY-----`
 
 func TestLoginProjectedToken(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	config := defaultTestBackendConfig()
 	config.pems = append(testDefaultPEMs, testMinikubePubKey)
 	b, storage := setupBackend(t, config)
@@ -1003,9 +979,6 @@ func TestLoginProjectedToken(t *testing.T) {
 }
 
 func TestAliasLookAheadProjectedToken(t *testing.T) {
-	tearDownTestCase := setupTestCase(t)
-	defer tearDownTestCase()
-
 	config := defaultTestBackendConfig()
 	config.pems = append(testDefaultPEMs, testMinikubePubKey)
 	config.saName = "default"

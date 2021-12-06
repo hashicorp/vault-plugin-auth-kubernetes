@@ -55,13 +55,17 @@ type kubeAuthBackend struct {
 	// - disable_local_ca_jwt is true
 	localSATokenReader *cachingFileReader
 
-	// localCACert contains the local CA certificate. Local CA certificate is
-	// used when running in a pod with following configuration
-	// - kubernetes_ca_cert is not set
-	// - disable_local_ca_jwt is true
-	localCACert string
-
 	l sync.RWMutex
+
+	// currentTime is a function that returns the current time.
+	// Normally set to time.Now but can be overwritten by test cases to manipulate time.
+	currentTime func() time.Time
+
+	// localCACertPath is the path to CA bundle.
+	localCACertPath string
+
+	// localJWTPath is the path to JWT token.
+	localJWTPath string
 }
 
 // Factory returns a new backend as logical.Backend.
@@ -74,13 +78,16 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 }
 
 func Backend() *kubeAuthBackend {
-	b := &kubeAuthBackend{}
+	b := &kubeAuthBackend{
+		currentTime:     time.Now,
+		localCACertPath: localCACertPath,
+		localJWTPath:    localJWTPath,
+	}
 
 	b.Backend = &framework.Backend{
-		InitializeFunc: b.initialize,
-		AuthRenew:      b.pathLoginRenew(),
-		BackendType:    logical.TypeCredential,
-		Help:           backendHelp,
+		AuthRenew:   b.pathLoginRenew(),
+		BackendType: logical.TypeCredential,
+		Help:        backendHelp,
 		PathsSpecial: &logical.Paths{
 			Unauthenticated: []string{
 				"login",
@@ -143,17 +150,28 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 		return nil, errors.New("could not load backend configuration")
 	}
 
-	// Add the local files if required.
-	if !config.DisableLocalCAJwt {
-		if len(config.TokenReviewerJWT) == 0 {
-			config.TokenReviewerJWT, err = b.localSATokenReader.ReadFile()
-			if err != nil {
-				return nil, err
-			}
+	// Nothing more to do if loading local CA cert and JWT token is disabled.
+	if config.DisableLocalCAJwt {
+		return config, nil
+	}
+
+	// Read local JWT token unless it was not stored in config.
+	if config.TokenReviewerJWT == "" {
+		if b.localSATokenReader == nil {
+			b.localSATokenReader = newCachingFileReader(b.localJWTPath, jwtReloadPeriod, b.currentTime)
 		}
-		if len(config.CACert) == 0 {
-			config.CACert = b.localCACert
+		config.TokenReviewerJWT, _ = b.localSATokenReader.ReadFile()
+		// Ignore error: make best effort trying to load local JWT,
+		// otherwise the JWT submitted in login payload will be used.
+	}
+
+	// Read local CA cert unless it was stored in config.
+	if config.CACert == "" {
+		buf, err := ioutil.ReadFile(b.localCACertPath)
+		if err != nil {
+			return nil, err
 		}
+		config.CACert = string(buf)
 	}
 
 	return config, nil
@@ -195,43 +213,6 @@ func (b *kubeAuthBackend) role(ctx context.Context, s logical.Storage, name stri
 	}
 
 	return role, nil
-}
-
-// initialize will initialize the global data.
-func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
-	// Check if configuration exists and load local token and CA cert files
-	// if they are used.
-	config, _ := b.config(ctx, req.Storage)
-	if config != nil && !config.DisableLocalCAJwt {
-		err := b.loadLocalFiles(len(config.TokenReviewerJWT) == 0, len(config.CACert) == 0)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// loadLocalFiles reads the local token and/or CA file into memory.
-//
-// The function should be called only in context where write lock to backend is
-// held or it is otherwise guaranteed that we can update backend object.
-func (b *kubeAuthBackend) loadLocalFiles(loadJWT, loadCACert bool) error {
-	if loadJWT {
-		b.localSATokenReader = newCachingFileReader(localJWTPath, jwtReloadPeriod)
-		_, err := b.localSATokenReader.ReadFile()
-		if err != nil {
-			return err
-		}
-	}
-
-	if loadCACert {
-		buf, err := ioutil.ReadFile(localCACertPath)
-		if err != nil {
-			return err
-		}
-		b.localCACert = string(buf)
-	}
-	return nil
 }
 
 func validateAliasNameSource(source string) error {
