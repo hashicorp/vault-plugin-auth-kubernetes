@@ -188,6 +188,9 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 		return logical.ErrorResponse(fmt.Sprintf("invalid role name %q", roleName)), nil
 	}
 
+	b.l.RLock()
+	defer b.l.RUnlock()
+
 	config, err := b.loadConfig(ctx, req.Storage)
 	if err != nil {
 		return nil, err
