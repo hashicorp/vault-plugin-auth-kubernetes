@@ -25,8 +25,8 @@ func setupLocalFiles(t *testing.T, b logical.Backend) func() {
 	}
 	token.WriteString(testLocalJWT)
 	token.Close()
-	b.(*kubeAuthBackend).localCACertPath = cert.Name()
-	b.(*kubeAuthBackend).localJWTPath = token.Name()
+	b.(*kubeAuthBackend).localCACertReader = newCachingFileReader(cert.Name(), caReloadPeriod, time.Now)
+	b.(*kubeAuthBackend).localSATokenReader = newCachingFileReader(token.Name(), jwtReloadPeriod, time.Now)
 
 	return func() {
 		os.Remove(cert.Name())
@@ -477,10 +477,9 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 
 	currentTime := time.Now()
 
-	b.(*kubeAuthBackend).localJWTPath = f.Name()
-	b.(*kubeAuthBackend).currentTime = func() time.Time {
+	b.(*kubeAuthBackend).localSATokenReader = newCachingFileReader(f.Name(), jwtReloadPeriod, func() time.Time {
 		return currentTime
-	}
+	})
 
 	token1 := "before-renewal"
 	token2 := "after-renewal"

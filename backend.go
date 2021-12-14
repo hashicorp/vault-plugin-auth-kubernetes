@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"sync"
 	"time"
@@ -37,6 +36,10 @@ var (
 	// "Clients should reload the token from disk periodically (once per minute
 	// is recommended) to ensure they continue to use a valid token."
 	jwtReloadPeriod = 1 * time.Minute
+
+	// caReloadPeriod is the time period how often the in-memory copy of local
+	// CA cert can be used, before reading it again from disk.
+	caReloadPeriod = 1 * time.Hour
 )
 
 // kubeAuthBackend implements logical.Backend
@@ -55,23 +58,13 @@ type kubeAuthBackend struct {
 	// - disable_local_ca_jwt is false
 	localSATokenReader *cachingFileReader
 
-	// localCACert contains the local CA certificate. Local CA certificate is
+	// localCACertReader contains the local CA certificate. Local CA certificate is
 	// used when running in a pod with following configuration
 	// - kubernetes_ca_cert is not set
 	// - disable_local_ca_jwt is false
-	localCACert string
+	localCACertReader *cachingFileReader
 
 	l sync.RWMutex
-
-	// currentTime is a function that returns the current time.
-	// Normally set to time.Now but can be overwritten by test cases to manipulate time.
-	currentTime func() time.Time
-
-	// localCACertPath is the path to CA bundle.
-	localCACertPath string
-
-	// localJWTPath is the path to JWT token.
-	localJWTPath string
 }
 
 // Factory returns a new backend as logical.Backend.
@@ -85,9 +78,8 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 
 func Backend() *kubeAuthBackend {
 	b := &kubeAuthBackend{
-		currentTime:     time.Now,
-		localCACertPath: localCACertPath,
-		localJWTPath:    localJWTPath,
+		localSATokenReader: newCachingFileReader(localCACertPath, jwtReloadPeriod, time.Now),
+		localCACertReader:  newCachingFileReader(localJWTPath, caReloadPeriod, time.Now),
 	}
 
 	b.Backend = &framework.Backend{
@@ -163,9 +155,6 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 
 	// Read local JWT token unless it was not stored in config.
 	if config.TokenReviewerJWT == "" {
-		if b.localSATokenReader == nil {
-			b.localSATokenReader = newCachingFileReader(b.localJWTPath, jwtReloadPeriod, b.currentTime)
-		}
 		config.TokenReviewerJWT, _ = b.localSATokenReader.ReadFile()
 		// Ignore error: make best effort trying to load local JWT,
 		// otherwise the JWT submitted in login payload will be used.
@@ -173,14 +162,10 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 
 	// Read local CA cert unless it was stored in config.
 	if config.CACert == "" {
-		if b.localCACert == "" {
-			buf, err := ioutil.ReadFile(b.localCACertPath)
-			if err != nil {
-				return nil, err
-			}
-			b.localCACert = string(buf)
+		config.CACert, err = b.localCACertReader.ReadFile()
+		if err != nil {
+			return nil, err
 		}
-		config.CACert = b.localCACert
 	}
 
 	return config, nil
