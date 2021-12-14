@@ -52,8 +52,14 @@ type kubeAuthBackend struct {
 	// It periodically reloads the token to support token rotation/renewal.
 	// Local token is used when running in a pod with following configuration
 	// - token_reviewer_jwt is not set
-	// - disable_local_ca_jwt is true
+	// - disable_local_ca_jwt is false
 	localSATokenReader *cachingFileReader
+
+	// localCACert contains the local CA certificate. Local CA certificate is
+	// used when running in a pod with following configuration
+	// - kubernetes_ca_cert is not set
+	// - disable_local_ca_jwt is false
+	localCACert string
 
 	l sync.RWMutex
 
@@ -167,11 +173,14 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 
 	// Read local CA cert unless it was stored in config.
 	if config.CACert == "" {
-		buf, err := ioutil.ReadFile(b.localCACertPath)
-		if err != nil {
-			return nil, err
+		if b.localCACert == "" {
+			buf, err := ioutil.ReadFile(b.localCACertPath)
+			if err != nil {
+				return nil, err
+			}
+			b.localCACert = string(buf)
 		}
-		config.CACert = string(buf)
+		config.CACert = b.localCACert
 	}
 
 	return config, nil
