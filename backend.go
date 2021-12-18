@@ -78,8 +78,8 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 
 func Backend() *kubeAuthBackend {
 	b := &kubeAuthBackend{
-		localSATokenReader: newCachingFileReader(localCACertPath, jwtReloadPeriod, time.Now),
-		localCACertReader:  newCachingFileReader(localJWTPath, caReloadPeriod, time.Now),
+		localSATokenReader: newCachingFileReader(localJWTPath, jwtReloadPeriod, time.Now),
+		localCACertReader:  newCachingFileReader(localCACertPath, caReloadPeriod, time.Now),
 	}
 
 	b.Backend = &framework.Backend{
