@@ -16,7 +16,7 @@ type cachingFileReader struct {
 	ttl time.Duration
 
 	// cache is the buffer holding the in-memory copy of the file.
-	cache *cachedFile
+	cache cachedFile
 
 	l sync.RWMutex
 
@@ -47,7 +47,7 @@ func (r *cachingFileReader) ReadFile() (string, error) {
 	now := r.currentTime()
 	cache := r.cache
 	r.l.RUnlock()
-	if cache != nil && now.Before(cache.expiry) {
+	if now.Before(cache.expiry) {
 		return cache.buf, nil
 	}
 
@@ -59,7 +59,7 @@ func (r *cachingFileReader) ReadFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	r.cache = &cachedFile{
+	r.cache = cachedFile{
 		buf:    string(buf),
 		expiry: now.Add(r.ttl),
 	}
