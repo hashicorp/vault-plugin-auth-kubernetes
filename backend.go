@@ -155,9 +155,12 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 
 	// Read local JWT token unless it was not stored in config.
 	if config.TokenReviewerJWT == "" {
-		config.TokenReviewerJWT, _ = b.localSATokenReader.ReadFile()
-		// Ignore error: make best effort trying to load local JWT,
-		// otherwise the JWT submitted in login payload will be used.
+		config.TokenReviewerJWT, err = b.localSATokenReader.ReadFile()
+		if err != nil {
+			// Ignore error: make best effort trying to load local JWT,
+			// otherwise the JWT submitted in login payload will be used.
+			b.Logger().Debug("failed to read local service account token, will use client token", "error", err)
+		}
 	}
 
 	// Read local CA cert unless it was stored in config.
