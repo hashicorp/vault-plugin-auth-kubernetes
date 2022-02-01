@@ -47,6 +47,7 @@ func TestConfig_Read(t *testing.T) {
 		"issuer":                 "",
 		"disable_iss_validation": false,
 		"disable_local_ca_jwt":   false,
+		"enable_custom_metadata_from_annotations": false,
 	}
 
 	req := &logical.Request{
