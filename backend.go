@@ -51,6 +51,9 @@ type kubeAuthBackend struct {
 	// review. Mocks should only be used in tests.
 	reviewFactory tokenReviewFactory
 
+	// serviceAccountReaderFactory is used to read service account annotations
+	serviceAccountReaderFactory serviceAccountReaderFactory
+
 	// localSATokenReader caches the service account token in memory.
 	// It periodically reloads the token to support token rotation/renewal.
 	// Local token is used when running in a pod with following configuration
@@ -105,6 +108,7 @@ func Backend() *kubeAuthBackend {
 
 	// Set the review factory to default to calling into the kubernetes API.
 	b.reviewFactory = tokenReviewAPIFactory
+	b.serviceAccountReaderFactory = serviceAccountAPIFactory
 
 	return b
 }

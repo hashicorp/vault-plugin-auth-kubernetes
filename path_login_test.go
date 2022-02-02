@@ -13,10 +13,11 @@ import (
 )
 
 var (
-	testNamespace   = "default"
-	testName        = "vault-auth"
-	testUID         = "d77f89bc-9055-11e7-a068-0800276d99bf"
-	testMockFactory = mockTokenReviewFactory(testName, testNamespace, testUID)
+	testNamespace                       = "default"
+	testName                            = "vault-auth"
+	testUID                             = "d77f89bc-9055-11e7-a068-0800276d99bf"
+	testMockTokenReviewFactory          = mockTokenReviewFactory(testName, testNamespace, testUID)
+	testMockServiceAccountReaderFactory = mockServiceAccountReaderFactory(map[string]string{"service_role": "authz"})
 
 	testGlobbedNamespace = "def*"
 	testGlobbedName      = "vault-*"
@@ -32,10 +33,11 @@ var (
 )
 
 type testBackendConfig struct {
-	pems            []string
-	saName          string
-	saNamespace     string
-	aliasNameSource string
+	pems                          []string
+	saName                        string
+	saNamespace                   string
+	aliasNameSource               string
+	customMetadataFromAnnotations bool
 }
 
 func defaultTestBackendConfig() *testBackendConfig {
@@ -55,6 +57,7 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 		"pem_keys":           config.pems,
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
+		"enable_custom_metadata_from_annotations": config.customMetadataFromAnnotations,
 	}
 
 	req := &logical.Request{
@@ -92,7 +95,8 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	b.(*kubeAuthBackend).reviewFactory = testMockFactory
+	b.(*kubeAuthBackend).reviewFactory = testMockTokenReviewFactory
+	b.(*kubeAuthBackend).serviceAccountReaderFactory = testMockServiceAccountReaderFactory
 	return b, storage
 }
 
@@ -586,6 +590,78 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 	}
 }
 
+func TestLoginWithServiceAccountAnnotations(t *testing.T) {
+	config := defaultTestBackendConfig()
+	config.customMetadataFromAnnotations = true
+	b, storage := setupBackend(t, config)
+
+	data := map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  jwtData,
+	}
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+		Connection: &logical.Connection{
+			RemoteAddr: "127.0.0.1",
+		},
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if role := resp.Auth.Metadata["service_role"]; role != "authz" {
+		t.Fatalf("expected service_role in Auth.Metadata, got: %s", role)
+	}
+
+	if role := resp.Auth.Alias.Metadata["service_role"]; role != "authz" {
+		t.Fatalf("expected service_role in Auth.Alias.Metadata, got: %s", role)
+	}
+
+	// test that we can't overwrite service_account_name and other properties with annotations
+
+	b.(*kubeAuthBackend).serviceAccountReaderFactory = mockServiceAccountReaderFactory(map[string]string{
+		"service_account_name":        "overwritten",
+		"service_account_uid":         "overwritten",
+		"service_account_namespace":   "overwritten",
+		"service_account_secret_name": "overwritten",
+	})
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if val := resp.Auth.Metadata["service_account_name"]; val != "vault-auth" {
+		t.Fatalf("unexpected service_account_name: %s", val)
+	}
+	if val := resp.Auth.Alias.Metadata["service_account_name"]; val != "vault-auth" {
+		t.Fatalf("unexpected service_account_name: %s", val)
+	}
+	if val := resp.Auth.Metadata["service_account_namespace"]; val != "default" {
+		t.Fatalf("unexpected service_account_namespace: %s", val)
+	}
+	if val := resp.Auth.Alias.Metadata["service_account_namespace"]; val != "default" {
+		t.Fatalf("unexpected service_account_namespace: %s", val)
+	}
+	if val := resp.Auth.Metadata["service_account_uid"]; val != "d77f89bc-9055-11e7-a068-0800276d99bf" {
+		t.Fatalf("unexpected service_account_uid: %s", val)
+	}
+	if val := resp.Auth.Alias.Metadata["service_account_uid"]; val != "d77f89bc-9055-11e7-a068-0800276d99bf" {
+		t.Fatalf("unexpected service_account_uid: %s", val)
+	}
+	if val := resp.Auth.Metadata["service_account_secret_name"]; val != "vault-auth-token-t5pcn" {
+		t.Fatalf("unexpected service_account_secret_name: %s", val)
+	}
+	if val := resp.Auth.Alias.Metadata["service_account_secret_name"]; val != "vault-auth-token-t5pcn" {
+		t.Fatalf("unexpected service_account_secret_name: %s", val)
+	}
+}
+
 func TestAliasLookAhead(t *testing.T) {
 	testCases := map[string]struct {
 		role              string
@@ -904,12 +980,12 @@ func TestLoginProjectedToken(t *testing.T) {
 		"normal": {
 			role:        "plugin-test",
 			jwt:         jwtData,
-			tokenReview: testMockFactory,
+			tokenReview: testMockTokenReviewFactory,
 		},
 		"fail": {
 			role:        "plugin-test-x",
 			jwt:         jwtData,
-			tokenReview: testMockFactory,
+			tokenReview: testMockTokenReviewFactory,
 			e:           roleNameError,
 		},
 		"projected-token": {
@@ -950,6 +1026,7 @@ func TestLoginProjectedToken(t *testing.T) {
 			}
 
 			b.(*kubeAuthBackend).reviewFactory = tc.tokenReview
+			b.(*kubeAuthBackend).serviceAccountReaderFactory = testMockServiceAccountReaderFactory
 
 			resp, err := b.HandleRequest(context.Background(), req)
 			if err != nil && tc.e == nil {
@@ -1007,6 +1084,26 @@ func TestAliasLookAheadProjectedToken(t *testing.T) {
 	if resp.Auth.Alias.Name != testProjectedUID {
 		t.Fatalf("Unexpected UID: %s", resp.Auth.Alias.Name)
 	}
+}
+
+type mockServiceAccountReader struct {
+	annotations map[string]string
+}
+
+func mockServiceAccountReaderFactory(annotations map[string]string) serviceAccountReaderFactory {
+	return func(config *kubeConfig) serviceAccountReader {
+		return &mockServiceAccountReader{
+			annotations: annotations,
+		}
+	}
+}
+
+func (s *mockServiceAccountReader) ReadAnnotations(ctx context.Context, name, namespace string) (map[string]string, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	return s.annotations, nil
 }
 
 // jwtProjectedData is a Projected Service Account jwt with expiration set to

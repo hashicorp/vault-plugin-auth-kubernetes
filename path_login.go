@@ -92,7 +92,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 
-	serviceAccount, err := b.parseAndValidateJWT(jwtStr, role, config)
+	serviceAccount, err := b.parseAndValidateJWT(ctx, jwtStr, role, config)
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +113,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	if err != nil {
 		return nil, err
 	}
+
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
 			Name: aliasName,
@@ -134,6 +135,21 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 			"role":                        roleName,
 		},
 		DisplayName: fmt.Sprintf("%s-%s", serviceAccount.namespace(), serviceAccount.name()),
+	}
+
+	if serviceAccount.Annotations != nil {
+		for key, value := range serviceAccount.Annotations {
+			// Ensure it's not possible to overwrite service_account_* information
+			if _, exists := auth.Alias.Metadata[key]; exists {
+				continue
+			}
+			if _, exists := auth.Metadata[key]; exists {
+				continue
+			}
+
+			auth.Alias.Metadata[key] = value
+			auth.Metadata[key] = value
+		}
 	}
 
 	role.PopulateTokenAuth(auth)
@@ -198,7 +214,7 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 
 	// validation of the JWT against the provided role ensures alias look ahead requests
 	// are authentic.
-	sa, err := b.parseAndValidateJWT(jwtStr, role, config)
+	sa, err := b.parseAndValidateJWT(ctx, jwtStr, role, config)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +234,7 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 }
 
 // parseAndValidateJWT is used to parse, validate and lookup the JWT token.
-func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, jwtStr string, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
 	// Parse into JWT
 	parsedJWT, err := jws.ParseJWT([]byte(jwtStr))
 	if err != nil {
@@ -270,6 +286,15 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 
 	if err := validator.Validate(parsedJWT); err != nil {
 		return nil, err
+	}
+
+	if config.EnableCustomMetadataFromAnnotations {
+		annotations, err := b.serviceAccountReaderFactory(config).ReadAnnotations(ctx, sa.Name, sa.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read serviceaccount annotations: %v", err)
+		}
+
+		sa.Annotations = annotations
 	}
 
 	// If we don't have any public keys to verify, return the sa and end early.
@@ -357,6 +382,11 @@ type serviceAccount struct {
 	Kubernetes *projectedServiceToken `mapstructure:"kubernetes.io"`
 	Expiration int64                  `mapstructure:"exp"`
 	IssuedAt   int64                  `mapstructure:"iat"`
+
+	// Kubernetes annotations for the service account with the `allowedAnnotationPrefix`,
+	// which will be loaded here if `config.EnableCustomMetadataFromAnnotations` is 
+	// enabled.
+	Annotations map[string]string
 }
 
 // uid returns the UID for the service account, preferring the projected service
