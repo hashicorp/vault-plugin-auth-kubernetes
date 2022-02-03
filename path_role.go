@@ -182,8 +182,11 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 	if role.NumUses > 0 {
 		d["num_uses"] = role.NumUses
 	}
-
-	d["alias_name_source"] = role.AliasNameSource
+	if role.AliasNameSource != "" {
+		d["alias_name_source"] = role.AliasNameSource
+	} else {
+		d["alias_name_source"] = aliasNameSourceDefault
+	}
 
 	return &logical.Response{
 		Data: d,
