@@ -2,6 +2,7 @@ package kubeauth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -376,5 +377,20 @@ func TestPath_Migration(t *testing.T) {
 	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Get the role from storage and check that AliasNameSource is set to default value.
+	raw, err := storage.Get(context.Background(), "role/new-entry")
+	if err != nil {
+		t.Fatalf("Could not read role entry: %s\n", err)
+	}
+
+	role := &roleStorageEntry{}
+	if err := json.Unmarshal(raw.Value, role); err != nil {
+		t.Fatalf("Could not deserialize role entry: %s\n", err)
+	}
+
+	if role.AliasNameSource != aliasNameSourceDefault {
+		t.Fatalf("Unexpected AliasNameSource: %s (expected %s)\n", role.AliasNameSource, aliasNameSourceDefault)
 	}
 }
