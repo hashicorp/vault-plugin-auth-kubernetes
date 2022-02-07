@@ -466,7 +466,7 @@ func TestPath_Update(t *testing.T) {
 					t.Fatalf("expected err %q, actual %q", tc.wantErr, actual)
 				}
 			} else {
-				if tc.wantErr == nil && (err != nil || (resp != nil && resp.IsError())) {
+				if err != nil || (resp != nil && resp.IsError()) {
 					t.Fatalf("err:%s resp:%#v\n", err, resp)
 				}
 
