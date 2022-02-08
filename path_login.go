@@ -384,7 +384,7 @@ type serviceAccount struct {
 	IssuedAt   int64                  `mapstructure:"iat"`
 
 	// Kubernetes annotations for the service account with the `allowedAnnotationPrefix`,
-	// which will be loaded here if `config.EnableCustomMetadataFromAnnotations` is 
+	// which will be loaded here if `config.EnableCustomMetadataFromAnnotations` is
 	// enabled.
 	Annotations map[string]string
 }
