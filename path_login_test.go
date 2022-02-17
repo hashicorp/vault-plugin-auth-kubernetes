@@ -12,7 +12,7 @@ import (
 
 	"github.com/briankassouf/jose/jws"
 	// TODO: using github.com/golang-jwt/jwt for tests only,
-	// as a part of moving off away from jose we should consider standardizing
+	// as a part of moving away from jose we should consider standardizing
 	// on a single JWT library for tests and runtime uses.
 	"github.com/golang-jwt/jwt"
 	"github.com/hashicorp/errwrap"
