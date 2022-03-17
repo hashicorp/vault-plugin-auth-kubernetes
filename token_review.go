@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"strings"
 
-	cleanhttp "github.com/hashicorp/go-cleanhttp"
 	authv1 "k8s.io/api/authentication/v1"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +28,7 @@ type tokenReviewResult struct {
 
 // This exists so we can use a mock TokenReview when running tests
 type tokenReviewer interface {
-	Review(context.Context, string, []string) (*tokenReviewResult, error)
+	Review(context.Context, string, []string, *http.Client) (*tokenReviewResult, error)
 }
 
 type tokenReviewFactory func(*kubeConfig) tokenReviewer
@@ -45,9 +44,7 @@ func tokenReviewAPIFactory(config *kubeConfig) tokenReviewer {
 	}
 }
 
-func (t *tokenReviewAPI) Review(ctx context.Context, jwt string, aud []string) (*tokenReviewResult, error) {
-
-	client := cleanhttp.DefaultClient()
+func (t *tokenReviewAPI) Review(ctx context.Context, jwt string, aud []string, client *http.Client) (*tokenReviewResult, error) {
 
 	// If we have a CA cert build the TLSConfig
 	if len(t.config.CACert) > 0 {
@@ -174,9 +171,10 @@ func parseResponse(resp *http.Response) (*authv1.TokenReview, error) {
 
 // mock review is used while testing
 type mockTokenReview struct {
-	saName      string
-	saNamespace string
-	saUID       string
+	saName      		string
+	saNamespace 		string
+	saUID       		string
+	checkPooledClient	bool
 }
 
 func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
@@ -189,7 +187,7 @@ func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
 	}
 }
 
-func (t *mockTokenReview) Review(ctx context.Context, cjwt string, aud []string) (*tokenReviewResult, error) {
+func (t *mockTokenReview) Review(ctx context.Context, cjwt string, aud []string, client *http.Client) (*tokenReviewResult, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

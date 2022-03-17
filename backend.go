@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/go-cleanhttp"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +47,9 @@ var (
 // kubeAuthBackend implements logical.Backend
 type kubeAuthBackend struct {
 	*framework.Backend
+
+	// HTTP client for login connection reuse
+	httpClient *http.Client
 
 	// reviewFactory is used to configure the strategy for doing a token review.
 	// Currently the only options are using the kubernetes API or mocking the
@@ -102,6 +107,9 @@ func Backend() *kubeAuthBackend {
 			pathsRole(b),
 		),
 	}
+
+	// Instantiate DefaultPooledClient and set as our default HTTP client for connection reuse
+	b.httpClient = cleanhttp.DefaultPooledClient()
 
 	// Set the review factory to default to calling into the kubernetes API.
 	b.reviewFactory = tokenReviewAPIFactory
