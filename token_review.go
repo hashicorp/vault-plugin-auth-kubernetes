@@ -35,8 +35,8 @@ type tokenReviewFactory func(*kubeConfig, *http.Client) tokenReviewer
 
 // This is the real implementation that calls the kubernetes API
 type tokenReviewAPI struct {
-	config 	*kubeConfig
-	client 	*http.Client
+	config *kubeConfig
+	client *http.Client
 }
 
 func tokenReviewAPIFactory(config *kubeConfig, client *http.Client) tokenReviewer {
@@ -174,10 +174,10 @@ func parseResponse(resp *http.Response) (*authv1.TokenReview, error) {
 
 // mock review is used while testing
 type mockTokenReview struct {
-	saName      		string
-	saNamespace 		string
-	saUID       		string
-	checkPooledClient	bool
+	saName            string
+	saNamespace       string
+	saUID             string
+	checkPooledClient bool
 }
 
 func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
