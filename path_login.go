@@ -103,7 +103,8 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	}
 
 	// look up the JWT token in the kubernetes API
-	err = serviceAccount.lookup(ctx, jwtStr, b.reviewFactory(config))
+	err = serviceAccount.lookup(ctx, jwtStr, b.reviewFactory(config, b.httpClient))
+
 	if err != nil {
 		b.Logger().Error(`login unauthorized due to: ` + err.Error())
 		return nil, logical.ErrPermissionDenied

@@ -28,24 +28,27 @@ type tokenReviewResult struct {
 
 // This exists so we can use a mock TokenReview when running tests
 type tokenReviewer interface {
-	Review(context.Context, string, []string, *http.Client) (*tokenReviewResult, error)
+	Review(context.Context, string, []string) (*tokenReviewResult, error)
 }
 
-type tokenReviewFactory func(*kubeConfig) tokenReviewer
+type tokenReviewFactory func(*kubeConfig, *http.Client) tokenReviewer
 
 // This is the real implementation that calls the kubernetes API
 type tokenReviewAPI struct {
-	config *kubeConfig
+	config 	*kubeConfig
+	client 	*http.Client
 }
 
-func tokenReviewAPIFactory(config *kubeConfig) tokenReviewer {
+func tokenReviewAPIFactory(config *kubeConfig, client *http.Client) tokenReviewer {
 	return &tokenReviewAPI{
 		config: config,
+		client: client,
 	}
 }
 
-func (t *tokenReviewAPI) Review(ctx context.Context, jwt string, aud []string, client *http.Client) (*tokenReviewResult, error) {
+func (t *tokenReviewAPI) Review(ctx context.Context, jwt string, aud []string) (*tokenReviewResult, error) {
 
+	client := t.client
 	// If we have a CA cert build the TLSConfig
 	if len(t.config.CACert) > 0 {
 		certPool := x509.NewCertPool()
@@ -187,7 +190,7 @@ func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
 	}
 }
 
-func (t *mockTokenReview) Review(ctx context.Context, cjwt string, aud []string, client *http.Client) (*tokenReviewResult, error) {
+func (t *mockTokenReview) Review(ctx context.Context, cjwt string, aud []string) (*tokenReviewResult, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

@@ -48,7 +48,7 @@ var (
 type kubeAuthBackend struct {
 	*framework.Backend
 
-	// HTTP client for login connection reuse
+	// default HTTP client for connection reuse
 	httpClient *http.Client
 
 	// reviewFactory is used to configure the strategy for doing a token review.
@@ -108,8 +108,10 @@ func Backend() *kubeAuthBackend {
 		),
 	}
 
-	// Instantiate DefaultPooledClient and set as our default HTTP client for connection reuse
-	b.httpClient = cleanhttp.DefaultPooledClient()
+	// create and store a new DefaultPooledClient for connection reuse
+	if b.httpClient == nil {
+		b.httpClient = cleanhttp.DefaultPooledClient()
+	}
 
 	// Set the review factory to default to calling into the kubernetes API.
 	b.reviewFactory = tokenReviewAPIFactory
