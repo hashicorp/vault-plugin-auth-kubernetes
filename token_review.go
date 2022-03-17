@@ -181,7 +181,7 @@ type mockTokenReview struct {
 }
 
 func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
-	return func(config *kubeConfig) tokenReviewer {
+	return func(config *kubeConfig, client *http.Client) tokenReviewer {
 		return &mockTokenReview{
 			saName:      name,
 			saNamespace: namespace,
