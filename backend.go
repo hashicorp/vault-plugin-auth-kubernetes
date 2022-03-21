@@ -111,7 +111,6 @@ func Backend() *kubeAuthBackend {
 	// Set a default http client.
 	b.httpClient = cleanhttp.DefaultPooledClient()
 
-
 	// Set the review factory to default to calling into the kubernetes API.
 	b.reviewFactory = tokenReviewAPIFactory
 

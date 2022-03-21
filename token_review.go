@@ -46,7 +46,6 @@ func tokenReviewAPIFactory(config *kubeConfig) tokenReviewer {
 
 func (t *tokenReviewAPI) Review(ctx context.Context, jwt string, aud []string, client *http.Client) (*tokenReviewResult, error) {
 
-
 	// If we have a CA cert build the TLSConfig
 	if len(t.config.CACert) > 0 {
 		certPool := x509.NewCertPool()
@@ -193,7 +192,7 @@ func (t *mockTokenReview) Review(ctx context.Context, cjwt string, aud []string,
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	
+
 	return &tokenReviewResult{
 		Name:      t.saName,
 		Namespace: t.saNamespace,
