@@ -6,6 +6,8 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/go-cleanhttp"
+	"net/http"
 
 	"github.com/briankassouf/jose/crypto"
 	"github.com/briankassouf/jose/jws"
@@ -102,8 +104,13 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 
+	// ensure the http client is not empty
+	if b.httpClient == nil {
+		b.httpClient = cleanhttp.DefaultPooledClient()
+	}
+
 	// look up the JWT token in the kubernetes API
-	err = serviceAccount.lookup(ctx, jwtStr, b.reviewFactory(config, b.httpClient))
+	err = serviceAccount.lookup(ctx, jwtStr, b.reviewFactory(config), b.httpClient)
 
 	if err != nil {
 		b.Logger().Error(`login unauthorized due to: ` + err.Error())
@@ -411,8 +418,8 @@ type k8sObjectRef struct {
 
 // lookup calls the TokenReview API in kubernetes to verify the token and secret
 // still exist.
-func (s *serviceAccount) lookup(ctx context.Context, jwtStr string, tr tokenReviewer) error {
-	r, err := tr.Review(ctx, jwtStr, s.Audience)
+func (s *serviceAccount) lookup(ctx context.Context, jwtStr string, tr tokenReviewer, client *http.Client) error {
+	r, err := tr.Review(ctx, jwtStr, s.Audience, client)
 	if err != nil {
 		return err
 	}
