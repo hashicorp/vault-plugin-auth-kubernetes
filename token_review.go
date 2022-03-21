@@ -171,10 +171,9 @@ func parseResponse(resp *http.Response) (*authv1.TokenReview, error) {
 
 // mock review is used while testing
 type mockTokenReview struct {
-	saName            string
-	saNamespace       string
-	saUID             string
-	checkPooledClient bool
+	saName      string
+	saNamespace string
+	saUID       string
 }
 
 func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
