@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"errors"
 
-	"github.com/briankassouf/jose/jws"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -82,6 +81,16 @@ then this plugin will use kubernetes.io/serviceaccount as the default issuer.
 					Name: "Disable use of local CA and service account JWT",
 				},
 			},
+			"jwt_rotation_period_seconds": {
+				Type: framework.TypeInt,
+				Description: `The period with which Vault will attempt to generate
+a fresh service account JWT when provided with a time-limited JWT. Defaults to 25%
+of the provided JWT's duration, to allow 3 attempts at refreshing before expiry.`,
+				Default: 0,
+				DisplayAttrs: &framework.DisplayAttributes{
+					Name: "JWT rotation period",
+				},
+			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.UpdateOperation: b.pathConfigWrite,
@@ -129,15 +138,8 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	caCert := data.Get("kubernetes_ca_cert").(string)
 	issuer := data.Get("issuer").(string)
 	disableIssValidation := data.Get("disable_iss_validation").(bool)
-	tokenReviewer := data.Get("token_reviewer_jwt").(string)
-
-	if tokenReviewer != "" {
-		// Validate it's a JWT
-		_, err := jws.ParseJWT([]byte(tokenReviewer))
-		if err != nil {
-			return nil, err
-		}
-	}
+	jwt := data.Get("token_reviewer_jwt").(string)
+	jwtRotationPeriod := data.Get("jwt_rotation_period_seconds").(int)
 
 	if disableLocalJWT && caCert == "" {
 		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
@@ -148,7 +150,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		PEMKeys:              pemList,
 		Host:                 host,
 		CACert:               caCert,
-		TokenReviewerJWT:     tokenReviewer,
+		TokenReviewerJWT:     jwt,
 		Issuer:               issuer,
 		DisableISSValidation: disableIssValidation,
 		DisableLocalCAJwt:    disableLocalJWT,
@@ -159,6 +161,36 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		config.PublicKeys[i], err = parsePublicKeyPEM([]byte(pem))
 		if err != nil {
 			return logical.ErrorResponse(err.Error()), nil
+		}
+	}
+
+	// TODO: Need to ensure local CA loader is considered
+	if jwt != "" {
+		// Validate it's a JWT
+		sa, err := parseJWT(jwt)
+		if err != nil {
+			return nil, err
+		}
+
+		if jwtRotationPeriod != 0 || sa.Expiration != 0 {
+			// We will rotate the JWT periodically. Do it once immediately to surface any errors early.
+			tokenClient := tokenReviewAPIFactory(config)
+			resp, err := tokenClient.Request(ctx, jwt, sa)
+			if err != nil {
+				return nil, err
+			}
+			config.TokenReviewerJWT = resp.Token
+			config.NextJWTRotationUnix = sa.IssuedAt + int64(jwtRotationPeriod)
+
+			tokenDuration := sa.Expiration - sa.IssuedAt
+			if jwtRotationPeriod == 0 {
+				config.NextJWTRotationUnix = sa.IssuedAt + (2*tokenDuration)/3
+			} else if int64(jwtRotationPeriod) < tokenDuration {
+				// We check JWT rotation against the real duration of a token because
+				// it's possible that the Kubernetes API will return a token with
+				// duration less than we asked for.
+				return logical.ErrorResponse("jwt_rotation_period_seconds must be less than the token duration; token duration=%d", tokenDuration), nil
+			}
 		}
 	}
 
@@ -195,6 +227,13 @@ type kubeConfig struct {
 	// the local CA cert and service account jwt when running in a Kubernetes
 	// pod
 	DisableLocalCAJwt bool `json:"disable_local_ca_jwt"`
+	// JWTRotationPeriodSeconds sets how early to start trying to rotate the
+	// reviewer token.
+	JWTRotationPeriodSeconds int `json:"jwt_rotation_period_seconds"`
+
+	// NextJWTRotation durably stores the next time after which we should attempt
+	// to rotate the service account JWT. Not settable or gettable by users.
+	NextJWTRotationUnix int64 `json:"next_jwt_rotation_unix,omitempty"`
 }
 
 // PasrsePublicKeyPEM is used to parse RSA and ECDSA public keys from PEMs

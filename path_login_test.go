@@ -104,7 +104,7 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	b.(*kubeAuthBackend).reviewFactory = testMockFactory
+	b.(*kubeAuthBackend).tokenClientFactory = testMockFactory
 	return b, storage
 }
 
@@ -910,7 +910,7 @@ func TestLoginProjectedToken(t *testing.T) {
 	testCases := map[string]struct {
 		role        string
 		jwt         string
-		tokenReview tokenReviewFactory
+		tokenReview tokenClientFactory
 		e           error
 	}{
 		"normal": {
@@ -961,7 +961,7 @@ func TestLoginProjectedToken(t *testing.T) {
 				},
 			}
 
-			b.(*kubeAuthBackend).reviewFactory = tc.tokenReview
+			b.(*kubeAuthBackend).tokenClientFactory = tc.tokenReview
 
 			resp, err := b.HandleRequest(context.Background(), req)
 			if err != nil && tc.e == nil {

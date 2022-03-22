@@ -9,8 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/briankassouf/jose/jws"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -46,10 +48,10 @@ var (
 type kubeAuthBackend struct {
 	*framework.Backend
 
-	// reviewFactory is used to configure the strategy for doing a token review.
+	// tokenClientFactory is used to configure the strategy for doing a token review.
 	// Currently the only options are using the kubernetes API or mocking the
 	// review. Mocks should only be used in tests.
-	reviewFactory tokenReviewFactory
+	tokenClientFactory tokenClientFactory
 
 	// localSATokenReader caches the service account token in memory.
 	// It periodically reloads the token to support token rotation/renewal.
@@ -101,10 +103,11 @@ func Backend() *kubeAuthBackend {
 			},
 			pathsRole(b),
 		),
+		PeriodicFunc: b.periodicFunc,
 	}
 
 	// Set the review factory to default to calling into the kubernetes API.
-	b.reviewFactory = tokenReviewAPIFactory
+	b.tokenClientFactory = tokenReviewAPIFactory
 
 	return b
 }
@@ -210,6 +213,86 @@ func (b *kubeAuthBackend) role(ctx context.Context, s logical.Storage, name stri
 	}
 
 	return role, nil
+}
+
+// periodicFunc handles background rotation of the service account JWT stored
+// in config. It is automatically called once every minute. If it errors, the
+// rotation will be attempted again the next time it's called.
+func (b *kubeAuthBackend) periodicFunc(ctx context.Context, req *logical.Request) error {
+	b.Logger().Debug("starting periodic func")
+	config, err := b.loadConfig(ctx, req.Storage)
+	if err != nil {
+		return err
+	}
+
+	// Config can be nil if deleted or when the engine is enabled
+	// but not yet configured.
+	if config == nil {
+		b.Logger().Trace("config is nil, exiting periodic func")
+		return nil
+	}
+
+	if time.Now().Unix() < config.NextJWTRotationUnix {
+		b.Logger().Trace("JWT does not need rotation yet", "now", time.Now().Unix(), "nextRotation", config.NextJWTRotationUnix)
+		return nil
+	}
+
+	sa, err := parseJWT(config.TokenReviewerJWT)
+	if err != nil {
+		return err
+	}
+
+	b.Logger().Debug("requesting new service account JWT")
+	tokenClient := tokenReviewAPIFactory(config)
+	resp, err := tokenClient.Request(ctx, config.TokenReviewerJWT, sa)
+	if err != nil {
+		return err
+	}
+
+	config.TokenReviewerJWT = resp.Token
+	tokenDuration := resp.ExpirationTimestamp.Unix() - time.Now().Unix()
+	rotationPeriod := (2 * tokenDuration) / 3
+	if config.JWTRotationPeriodSeconds > 0 {
+		if int64(config.JWTRotationPeriodSeconds) < tokenDuration {
+			rotationPeriod = int64(config.JWTRotationPeriodSeconds)
+		} else {
+			b.Logger().Warn(
+				"falling back to default rotation period as configured rotation period was greater than the token duration",
+				"tokenDuration", tokenDuration,
+				"jwt_rotation_period_seconds", config.JWTRotationPeriodSeconds,
+			)
+		}
+	}
+	config.NextJWTRotationUnix = time.Now().Unix() + rotationPeriod
+
+	entry, err := logical.StorageEntryJSON(configPath, config)
+	if err != nil {
+		return err
+	}
+
+	if err := req.Storage.Put(ctx, entry); err != nil {
+		return err
+	}
+
+	b.Logger().Debug("successfully rotated service account JWT")
+
+	return nil
+}
+
+func parseJWT(jwt string) (serviceAccount, error) {
+	parsedJWT, err := jws.ParseJWT([]byte(jwt))
+	if err != nil {
+		return serviceAccount{}, err
+	}
+
+	sa := serviceAccount{}
+	// Decode claims into a service account object
+	err = mapstructure.Decode(parsedJWT.Claims(), &sa)
+	if err != nil {
+		return serviceAccount{}, err
+	}
+
+	return sa, nil
 }
 
 func validateAliasNameSource(source string) error {

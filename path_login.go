@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/briankassouf/jose/crypto"
 	"github.com/briankassouf/jose/jws"
@@ -103,7 +104,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	}
 
 	// look up the JWT token in the kubernetes API
-	err = serviceAccount.lookup(ctx, jwtStr, b.reviewFactory(config))
+	err = serviceAccount.lookup(ctx, jwtStr, b.tokenClientFactory(config))
 	if err != nil {
 		b.Logger().Error(`login unauthorized due to: ` + err.Error())
 		return nil, logical.ErrPermissionDenied
@@ -273,7 +274,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 	}
 
 	if err := validator.Validate(parsedJWT); err != nil {
-		return nil, err
+		return nil, logical.CodedError(http.StatusForbidden, err.Error())
 	}
 
 	// If we don't have any public keys to verify, return the sa and end early.
@@ -343,7 +344,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 		}
 	}
 
-	return nil, validationErr
+	return nil, logical.CodedError(http.StatusForbidden, validationErr.Error())
 }
 
 // serviceAccount holds the metadata from the JWT token and is used to lookup
@@ -410,7 +411,7 @@ type k8sObjectRef struct {
 
 // lookup calls the TokenReview API in kubernetes to verify the token and secret
 // still exist.
-func (s *serviceAccount) lookup(ctx context.Context, jwtStr string, tr tokenReviewer) error {
+func (s *serviceAccount) lookup(ctx context.Context, jwtStr string, tr tokenClient) error {
 	r, err := tr.Review(ctx, jwtStr, s.Audience)
 	if err != nil {
 		return err
