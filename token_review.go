@@ -192,6 +192,14 @@ func (t *mockTokenReview) Review(ctx context.Context, cjwt string, aud []string,
 		return nil, ctx.Err()
 	}
 
+	httpTransport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		return nil, errors.New("failed to check whether DisableKeepAlives is false as Transport is not *http.Transport")
+	}
+	if httpTransport.DisableKeepAlives {
+		return nil, errors.New("expected DisableKeepAlives to be false but was true")
+	}
+
 	return &tokenReviewResult{
 		Name:      t.saName,
 		Namespace: t.saNamespace,
