@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-cleanhttp"
 	"net/http"
 
 	"github.com/briankassouf/jose/crypto"
@@ -102,11 +101,6 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	aliasName, err := b.getAliasName(role, serviceAccount)
 	if err != nil {
 		return nil, err
-	}
-
-	// ensure the http client is not empty
-	if b.httpClient == nil {
-		b.httpClient = cleanhttp.DefaultPooledClient()
 	}
 
 	// look up the JWT token in the kubernetes API
