@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"net/http"
 
 	"github.com/briankassouf/jose/jws"
 	"github.com/hashicorp/vault/sdk/framework"
@@ -152,6 +154,22 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		Issuer:               issuer,
 		DisableISSValidation: disableIssValidation,
 		DisableLocalCAJwt:    disableLocalJWT,
+	}
+
+	b.l.Lock()
+	defer b.l.Unlock()
+
+	// If we have a CA cert build the TLSConfig
+	if len(config.CACert) > 0 {
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM([]byte(config.CACert))
+
+		tlsConfig := &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			RootCAs:    certPool,
+		}
+
+		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}
 
 	var err error

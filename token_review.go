@@ -3,8 +3,6 @@ package kubeauth
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,19 +43,6 @@ func tokenReviewAPIFactory(config *kubeConfig) tokenReviewer {
 }
 
 func (t *tokenReviewAPI) Review(ctx context.Context, jwt string, aud []string, client *http.Client) (*tokenReviewResult, error) {
-
-	// If we have a CA cert build the TLSConfig
-	if len(t.config.CACert) > 0 {
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM([]byte(t.config.CACert))
-
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool,
-		}
-
-		client.Transport.(*http.Transport).TLSClientConfig = tlsConfig
-	}
 
 	// Create the TokenReview Object and marshal it into json
 	trReq := &authv1.TokenReview{

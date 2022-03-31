@@ -103,6 +103,8 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 
+	b.l.RLock()
+	defer b.l.RUnlock()
 	// look up the JWT token in the kubernetes API
 	err = serviceAccount.lookup(ctx, jwtStr, b.reviewFactory(config), b.httpClient)
 
