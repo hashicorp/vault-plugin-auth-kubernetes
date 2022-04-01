@@ -415,7 +415,7 @@ type k8sObjectRef struct {
 // lookup calls the TokenReview API in kubernetes to verify the token and secret
 // still exist.
 func (s *serviceAccount) lookup(ctx context.Context, jwtStr string, tr tokenReviewer, client *http.Client) error {
-	r, err := tr.Review(ctx, jwtStr, s.Audience, client)
+	r, err := tr.Review(ctx, client, jwtStr, s.Audience)
 	if err != nil {
 		return err
 	}

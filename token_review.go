@@ -26,7 +26,7 @@ type tokenReviewResult struct {
 
 // This exists so we can use a mock TokenReview when running tests
 type tokenReviewer interface {
-	Review(context.Context, string, []string, *http.Client) (*tokenReviewResult, error)
+	Review(context.Context, *http.Client, string, []string) (*tokenReviewResult, error)
 }
 
 type tokenReviewFactory func(*kubeConfig) tokenReviewer
@@ -42,7 +42,7 @@ func tokenReviewAPIFactory(config *kubeConfig) tokenReviewer {
 	}
 }
 
-func (t *tokenReviewAPI) Review(ctx context.Context, jwt string, aud []string, client *http.Client) (*tokenReviewResult, error) {
+func (t *tokenReviewAPI) Review(ctx context.Context, client *http.Client, jwt string, aud []string) (*tokenReviewResult, error) {
 
 	// Create the TokenReview Object and marshal it into json
 	trReq := &authv1.TokenReview{
@@ -172,7 +172,7 @@ func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
 	}
 }
 
-func (t *mockTokenReview) Review(ctx context.Context, cjwt string, aud []string, client *http.Client) (*tokenReviewResult, error) {
+func (t *mockTokenReview) Review(ctx context.Context, client *http.Client, cjwt string, aud []string) (*tokenReviewResult, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

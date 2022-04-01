@@ -2,6 +2,8 @@ package kubeauth
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -108,8 +110,14 @@ func Backend() *kubeAuthBackend {
 		),
 	}
 
-	// Set a default http client.
+	// Set a default HTTP client
 	b.httpClient = cleanhttp.DefaultPooledClient()
+
+	// Set the HTTP client's TLS config
+	b.httpClient.Transport.(*http.Transport).TLSClientConfig = &tls.Config{
+		RootCAs:    x509.NewCertPool(),
+		MinVersion: tls.VersionTLS12,
+	}
 
 	// Set the review factory to default to calling into the kubernetes API.
 	b.reviewFactory = tokenReviewAPIFactory
