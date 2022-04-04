@@ -17,7 +17,7 @@ test: fmtcheck
 
 .PHONY: integration-test
 integration-test:
-	INTEGRATION_TESTS=true CGO_ENABLED=0 go test github.com/hashicorp/vault-plugin-auth-kubernetes/integrationtest/... $(TESTARGS) -timeout=20m
+	INTEGRATION_TESTS=true CGO_ENABLED=0 go test github.com/hashicorp/vault-plugin-auth-kubernetes/integrationtest/... $(TESTARGS) -count=1 -timeout=20m
 
 .PHONY: fmtcheck
 fmtcheck:
@@ -52,10 +52,19 @@ vault-image:
 setup-integration-test: teardown-integration-test vault-image
 	kind --name ${KIND_CLUSTER_NAME} load docker-image hashicorp/vault:dev
 	kubectl create namespace test
-	kubectl apply --namespace=test -f integrationtest/vault/vault.yaml
+	helm install vault vault --repo https://helm.releases.hashicorp.com --version=0.19.0 \
+		--wait --timeout=5m \
+		--namespace=test \
+		--set server.dev.enabled=true \
+		--set server.image.tag=dev \
+		--set server.image.pullPolicy=Never \
+		--set injector.enabled=false \
+		--set server.extraArgs="-dev-plugin-dir=/vault/plugin_directory"
+	kubectl patch --namespace=test statefulset vault --patch-file integrationtest/vault/hostPortPatch.yaml
+	kubectl delete --namespace=test pod vault-0
 	kubectl wait --namespace=test --for=condition=Ready --timeout=5m pod -l app.kubernetes.io/name=vault
 
 .PHONY: teardown-integration-test
 teardown-integration-test:
-	kubectl delete --ignore-not-found --namespace=test  -f integrationtest/vault/vault.yaml
+	helm uninstall vault --namespace=test || true
 	kubectl delete --ignore-not-found namespace test
