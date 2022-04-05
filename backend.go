@@ -113,12 +113,6 @@ func Backend() *kubeAuthBackend {
 	// Set a default HTTP client
 	b.httpClient = cleanhttp.DefaultPooledClient()
 
-	// Set the HTTP client's TLS config
-	b.httpClient.Transport.(*http.Transport).TLSClientConfig = &tls.Config{
-		RootCAs:    x509.NewCertPool(),
-		MinVersion: tls.VersionTLS12,
-	}
-
 	// Set the review factory to default to calling into the kubernetes API.
 	b.reviewFactory = tokenReviewAPIFactory
 
@@ -180,11 +174,22 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 	}
 
 	// Read local CA cert unless it was stored in config.
+	// Else build the TLSConfig with the trusted CA cert and load into client
 	if config.CACert == "" {
 		config.CACert, err = b.localCACertReader.ReadFile()
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM([]byte(config.CACert))
+
+		tlsConfig := &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			RootCAs:    certPool,
+		}
+
+		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}
 
 	return config, nil
