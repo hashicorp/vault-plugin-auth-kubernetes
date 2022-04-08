@@ -32,6 +32,14 @@ func TestMain(m *testing.M) {
 	}
 }
 
+// TODO: In 1.24 this will break because k8s will stop auto-generating tokens for service accounts:
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/2799-reduction-of-secret-based-service-account-token#proposal.
+// The cleanest long-term solution will probably be to use TokenRequest to generate our own tokens on demand.
+// Unfortunately that would take a little more boiler plate than usual because kubectl doesn't support it directly and
+// we don't want to import k8s.io/client-go, as its dependencies have caused issues in the past in upstream Vault.
+// We could do kubectl config --raw -o json and parse the result into a struct, then extract the
+// API/CA/auth information required from there to interact with the k8s API directly. There's a good chance there's a
+// cleaner/simpler way too.
 func getTokenReviewerJWT() string {
 	name := runCmd("kubectl --namespace=test get serviceaccount test-token-reviewer-account -o jsonpath={.secrets[0].name}")
 	b64token := runCmd(fmt.Sprintf("kubectl --namespace=test get secrets %s -o jsonpath={.data.token}", name))
@@ -61,6 +69,7 @@ func runCmd(command string) string {
 func setupKubernetesAuth(t *testing.T, boundServiceAccountName string,
 	kubeConfigOverride map[string]interface{},
 ) (func(), *api.Client) {
+	t.Helper()
 	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
 	client, err := api.NewClient(nil)
 	if err != nil {

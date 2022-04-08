@@ -2,6 +2,8 @@ package kubeauth
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +19,12 @@ import (
 
 // defaultJWTIssuer is used to verify the iss header on the JWT if the config doesn't specify an issuer.
 var defaultJWTIssuer = "kubernetes/serviceaccount"
+
+// See https://datatracker.ietf.org/doc/html/rfc7518#section-3.
+var supportedJwtAlgs = []string{
+	"RS256", "RS384", "RS512",
+	"ES256", "ES384", "ES512",
+}
 
 // pathLogin returns the path configurations for login endpoints
 func pathLogin(b *kubeAuthBackend) *framework.Path {
@@ -84,7 +92,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 
 	serviceAccount, err := b.parseAndValidateJWT(jwtStr, role, config)
 	if err == jwt.ErrSignatureInvalid {
-		b.Logger().Error(`login unauthorized due to: ` + err.Error())
+		b.Logger().Debug(`login unauthorized`, "err", err)
 		return nil, logical.ErrPermissionDenied
 	} else if err != nil {
 		return nil, err
@@ -98,7 +106,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	// look up the JWT token in the kubernetes API
 	err = serviceAccount.lookup(ctx, jwtStr, b.reviewFactory(config))
 	if err != nil {
-		b.Logger().Error(`login unauthorized due to: ` + err.Error())
+		b.Logger().Debug(`login unauthorized`, "err", err)
 		return nil, logical.ErrPermissionDenied
 	}
 
@@ -218,9 +226,15 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 // any of the keys passed in.
 func (b *kubeAuthBackend) parseAndVerifySignature(token string, keys ...interface{}) (*jwt.Token, error) {
 	for i, k := range keys {
+		// only consider RSA & ECDSA signatures
+		_, isEcdsa := k.(*ecdsa.PublicKey)
+		_, isRsa := k.(*rsa.PublicKey)
+		if !(isEcdsa || isRsa) {
+			continue
+		}
 		result, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 			return k, nil
-		})
+		}, jwt.WithValidMethods(supportedJwtAlgs))
 		if result != nil && err == nil {
 			return result, nil
 		}
