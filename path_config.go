@@ -133,7 +133,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 
 	if tokenReviewer != "" {
 		// Validate it's a JWT, but don't verify the signature, since we may not have the right cert.
-		_, _, err := jwt.NewParser().ParseUnverified(tokenReviewer, &jwt.MapClaims{})
+		_, _, err := jwt.NewParser().ParseUnverified(tokenReviewer, jwt.MapClaims{})
 		if err != nil {
 			return nil, err
 		}

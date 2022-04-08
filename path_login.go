@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"reflect"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -16,14 +15,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-var (
-	// defaultJWTIssuer is used to verify the iss header on the JWT if the config doesn't specify an issuer.
-	defaultJWTIssuer = "kubernetes/serviceaccount"
-
-	// errMismatchedSigningMethod is used if the certificate doesn't match the
-	// JWT's expected signing method.
-	errMismatchedSigningMethod = errors.New("invalid signing method")
-)
+// defaultJWTIssuer is used to verify the iss header on the JWT if the config doesn't specify an issuer.
+var defaultJWTIssuer = "kubernetes/serviceaccount"
 
 // pathLogin returns the path configurations for login endpoints
 func pathLogin(b *kubeAuthBackend) *framework.Path {
@@ -223,19 +216,21 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 
 // parseAndVerifySignature parses the JWT token validating the signature against
 // any of the keys passed in.
-func parseAndVerifySignature(token string, keys ...interface{}) (*jwt.Token, error) {
-	for _, k := range keys {
+func (b *kubeAuthBackend) parseAndVerifySignature(token string, keys ...interface{}) (*jwt.Token, error) {
+	for i, k := range keys {
 		result, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 			return k, nil
 		})
 		if result != nil && err == nil {
 			return result, nil
 		}
-		if err != nil && strings.ToLower(err.Error()) == "token is expired" {
+		if err != nil && strings.ToLower(err.Error()) == strings.ToLower(jwt.ErrTokenExpired.Error()) {
 			return nil, err
 		}
+		b.Logger().Debug(fmt.Sprintf("JWT signature did not validate with key %d, testing next key", i))
 		// otherwise, try the next key
 	}
+	b.Logger().Debug("JWT signature did not validate with any keys")
 	return nil, jwt.ErrSignatureInvalid
 }
 
@@ -248,7 +243,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 		// we don't verify the signature if we aren't configured with public keys
 		token, _, err = jwt.NewParser().ParseUnverified(jwtStr, jwt.MapClaims{})
 	} else {
-		token, err = parseAndVerifySignature(jwtStr, config.PublicKeys...)
+		token, err = b.parseAndVerifySignature(jwtStr, config.PublicKeys...)
 	}
 	if err != nil {
 		return nil, err
@@ -257,7 +252,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(jwtStr string, role *roleStorageEn
 	// do default claims validation (expiration, issued at, not before)
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, fmt.Errorf("unsupported JWT claims type: %v %v", reflect.TypeOf(token.Claims), token.Claims)
+		return nil, fmt.Errorf("unsupported JWT claims type")
 	}
 	err = claims.Valid()
 	if err != nil {

@@ -26,24 +26,23 @@ func TestMain(m *testing.M) {
 	if os.Getenv("INTEGRATION_TESTS") != "" {
 		os.Setenv("VAULT_ADDR", "http://127.0.0.1:38200")
 		os.Setenv("VAULT_TOKEN", "root")
-		os.Setenv("KUBERNETES_JWT", getKubernetesJwt())
-		os.Setenv("TOKEN_REVIEWER_JWT", getTokenReviewerJwt())
+		os.Setenv("KUBERNETES_JWT", getVaultServiceAccountJWT())
+		os.Setenv("TOKEN_REVIEWER_JWT", getTokenReviewerJWT())
 		os.Exit(m.Run())
 	}
 }
 
-func getTokenReviewerJwt() string {
+func getTokenReviewerJWT() string {
 	name := runCmd("kubectl --namespace=test get serviceaccount test-token-reviewer-account -o jsonpath={.secrets[0].name}")
 	b64token := runCmd(fmt.Sprintf("kubectl --namespace=test get secrets %s -o jsonpath={.data.token}", name))
 	token, err := base64.URLEncoding.DecodeString(b64token)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		panic(err)
 	}
 	return string(token)
 }
 
-func getKubernetesJwt() string {
+func getVaultServiceAccountJWT() string {
 	return runCmd("kubectl exec --namespace=test vault-0 -- cat /var/run/secrets/kubernetes.io/serviceaccount/token")
 }
 
@@ -54,14 +53,14 @@ func runCmd(command string) string {
 	cmd.Stdout = out
 	cmd.Stderr = out
 	if err := cmd.Run(); err != nil {
-		fmt.Println(out.String())
-		fmt.Println(err)
-		os.Exit(1)
+		panic(fmt.Sprintf("Got unexpected output: %s, err = %s", out.String(), err))
 	}
 	return out.String()
 }
 
-func TestSuccess(t *testing.T) {
+func setupKubernetesAuth(t *testing.T, boundServiceAccountName string,
+	kubeConfigOverride map[string]interface{},
+) (func(), *api.Client) {
 	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
 	client, err := api.NewClient(nil)
 	if err != nil {
@@ -75,29 +74,48 @@ func TestSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer func() {
+	deferred := func() {
 		_, err = client.Logical().Delete("sys/auth/kubernetes")
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+
+	defer func() {
+		// just in case setupKubernetesAuth panics before returning deferred to the caller
+		if panicErr := recover(); panicErr != nil {
+			deferred()
+			panic(panicErr)
+		}
 	}()
 
-	_, err = client.Logical().Write("auth/kubernetes/config", map[string]interface{}{
-		"kubernetes_host": "https://kubernetes.default.svc.cluster.local",
-	})
+	if len(kubeConfigOverride) == 0 {
+		_, err = client.Logical().Write("auth/kubernetes/config", map[string]interface{}{
+			"kubernetes_host": "https://kubernetes.default.svc.cluster.local",
+		})
+	} else {
+		_, err = client.Logical().Write("auth/kubernetes/config", kubeConfigOverride)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = client.Logical().Write("auth/kubernetes/role/test-role", map[string]interface{}{
-		"bound_service_account_names":      "vault", // vault is the serviceaccount created by helm
+		"bound_service_account_names":      boundServiceAccountName,
 		"bound_service_account_namespaces": "test",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+	return deferred, client
+}
+
+func TestSuccess(t *testing.T) {
+	deferred, client := setupKubernetesAuth(t, "vault", nil)
+	defer deferred()
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
 		"jwt":  os.Getenv("KUBERNETES_JWT"),
 	})
@@ -107,43 +125,13 @@ func TestSuccess(t *testing.T) {
 }
 
 func TestSuccessWithTokenReviewerJwt(t *testing.T) {
-	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
-	client, err := api.NewClient(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = client.Logical().Write("sys/auth/kubernetes", map[string]interface{}{
-		"type": "kubernetes-dev",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		_, err = client.Logical().Delete("sys/auth/kubernetes")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	_, err = client.Logical().Write("auth/kubernetes/config", map[string]interface{}{
+	deferred, client := setupKubernetesAuth(t, "vault", map[string]interface{}{
 		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
 		"token_reviewer_jwt": os.Getenv("TOKEN_REVIEWER_JWT"),
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	defer deferred()
 
-	_, err = client.Logical().Write("auth/kubernetes/role/test-role", map[string]interface{}{
-		"bound_service_account_names":      "vault", // vault is the serviceaccount created by helm
-		"bound_service_account_namespaces": "test",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
 		"jwt":  os.Getenv("KUBERNETES_JWT"),
 	})
@@ -153,43 +141,13 @@ func TestSuccessWithTokenReviewerJwt(t *testing.T) {
 }
 
 func TestFailWithBadTokenReviewerJwt(t *testing.T) {
-	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
-	client, err := api.NewClient(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = client.Logical().Write("sys/auth/kubernetes", map[string]interface{}{
-		"type": "kubernetes-dev",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		_, err = client.Logical().Delete("sys/auth/kubernetes")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	_, err = client.Logical().Write("auth/kubernetes/config", map[string]interface{}{
+	deferred, client := setupKubernetesAuth(t, "vault", map[string]interface{}{
 		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
 		"token_reviewer_jwt": badTokenReviewerJwt,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	defer deferred()
 
-	_, err = client.Logical().Write("auth/kubernetes/role/test-role", map[string]interface{}{
-		"bound_service_account_names":      "vault", // vault is the serviceaccount created by helm
-		"bound_service_account_namespaces": "test",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
 		"jwt":  os.Getenv("KUBERNETES_JWT"),
 	})
@@ -203,42 +161,10 @@ func TestFailWithBadTokenReviewerJwt(t *testing.T) {
 }
 
 func TestUnauthorizedServiceAccountErrorCode(t *testing.T) {
-	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
-	client, err := api.NewClient(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	deferred, client := setupKubernetesAuth(t, "badServiceAccount", nil)
+	defer deferred()
 
-	_, err = client.Logical().Write("sys/auth/kubernetes", map[string]interface{}{
-		"type": "kubernetes-dev",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		_, err = client.Logical().Delete("sys/auth/kubernetes")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	_, err = client.Logical().Write("auth/kubernetes/config", map[string]interface{}{
-		"kubernetes_host": "https://kubernetes.default.svc.cluster.local",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = client.Logical().Write("auth/kubernetes/role/test-role", map[string]interface{}{
-		"bound_service_account_names":      "test", // this serviceaccount does not exist
-		"bound_service_account_namespaces": "test",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
 		"jwt":  os.Getenv("KUBERNETES_JWT"),
 	})
