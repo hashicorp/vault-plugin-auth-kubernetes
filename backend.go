@@ -7,12 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/go-cleanhttp"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -108,15 +108,45 @@ func Backend() *kubeAuthBackend {
 			},
 			pathsRole(b),
 		),
+		InitializeFunc: b.initialize,
 	}
 
-	// Set a default HTTP client
+	// Set default HTTP client
 	b.httpClient = cleanhttp.DefaultPooledClient()
 
 	// Set the review factory to default to calling into the kubernetes API.
 	b.reviewFactory = tokenReviewAPIFactory
 
 	return b
+}
+
+// initialize is used to handle the state of config values just after a plugin has been mounted
+func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
+	// Try to load the config on init
+	config, err := b.loadConfig(ctx, req.Storage)
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		return nil
+	}
+
+	b.l.Lock()
+	defer b.l.Unlock()
+	// If we have a CA cert build the TLSConfig
+	if len(config.CACert) > 0 {
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM([]byte(config.CACert))
+
+		tlsConfig := &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			RootCAs:    certPool,
+		}
+
+		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
+	}
+
+	return nil
 }
 
 // config takes a storage object and returns a kubeConfig object.
@@ -180,16 +210,6 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM([]byte(config.CACert))
-
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool,
-		}
-
-		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}
 
 	return config, nil
