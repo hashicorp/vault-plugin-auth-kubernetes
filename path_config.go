@@ -158,7 +158,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 
 	b.l.Lock()
 	defer b.l.Unlock()
-	
+
 	// If we have a CA cert build the TLSConfig
 	if len(config.CACert) > 0 {
 		certPool := x509.NewCertPool()
