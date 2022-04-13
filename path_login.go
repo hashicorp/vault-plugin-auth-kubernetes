@@ -92,6 +92,9 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	if err != nil {
 		return nil, err
 	}
+	if config == nil {
+		return nil, errors.New("could not load backend configuration")
+	}
 
 	serviceAccount, err := b.parseAndValidateJWT(jwtStr, role, config)
 	if err != nil {
@@ -103,8 +106,6 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 
-	b.l.RLock()
-	defer b.l.RUnlock()
 	// look up the JWT token in the kubernetes API
 	err = serviceAccount.lookup(ctx, jwtStr, b.reviewFactory(config), b.httpClient)
 
@@ -203,7 +204,9 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 	if err != nil {
 		return nil, err
 	}
-
+	if config == nil {
+		return nil, errors.New("could not load backend configuration")
+	}
 	// validation of the JWT against the provided role ensures alias look ahead requests
 	// are authentic.
 	sa, err := b.parseAndValidateJWT(jwtStr, role, config)

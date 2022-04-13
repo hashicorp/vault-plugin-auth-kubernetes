@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/hashicorp/go-cleanhttp"
 	"net/http"
@@ -120,9 +119,9 @@ func Backend() *kubeAuthBackend {
 	return b
 }
 
-// initialize is used to handle the state of config values just after a plugin has been mounted
+// initialize is used to handle the state of config values just after the K8s plugin has been mounted
 func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
-	// Try to load the config on init
+	// Try to load the config on initialization
 	config, err := b.loadConfig(ctx, req.Storage)
 	if err != nil {
 		return err
@@ -184,9 +183,6 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 	if err != nil {
 		return nil, err
 	}
-	if config == nil {
-		return nil, errors.New("could not load backend configuration")
-	}
 
 	// Nothing more to do if loading local CA cert and JWT token is disabled.
 	if config.DisableLocalCAJwt {
@@ -197,7 +193,7 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 	if config.TokenReviewerJWT == "" {
 		config.TokenReviewerJWT, err = b.localSATokenReader.ReadFile()
 		if err != nil {
-			// Ignore error: make best effort trying to load local JWT,
+			// Ignore error: make the best effort trying to load local JWT,
 			// otherwise the JWT submitted in login payload will be used.
 			b.Logger().Debug("failed to read local service account token, will use client token", "error", err)
 		}
