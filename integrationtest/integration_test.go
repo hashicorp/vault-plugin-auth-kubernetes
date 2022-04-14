@@ -66,9 +66,7 @@ func runCmd(command string) string {
 	return out.String()
 }
 
-func setupKubernetesAuth(t *testing.T, boundServiceAccountName string,
-	kubeConfigOverride map[string]interface{},
-) (func(), *api.Client) {
+func setupKubernetesAuth(t *testing.T, boundServiceAccountName string, kubeConfigOverride map[string]interface{}) (*api.Client, func()) {
 	t.Helper()
 	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
 	client, err := api.NewClient(nil)
@@ -117,11 +115,11 @@ func setupKubernetesAuth(t *testing.T, boundServiceAccountName string,
 		t.Fatal(err)
 	}
 
-	return deferred, client
+	return client, deferred
 }
 
 func TestSuccess(t *testing.T) {
-	deferred, client := setupKubernetesAuth(t, "vault", nil)
+	client, deferred := setupKubernetesAuth(t, "vault", nil)
 	defer deferred()
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
@@ -134,7 +132,7 @@ func TestSuccess(t *testing.T) {
 }
 
 func TestSuccessWithTokenReviewerJwt(t *testing.T) {
-	deferred, client := setupKubernetesAuth(t, "vault", map[string]interface{}{
+	client, deferred := setupKubernetesAuth(t, "vault", map[string]interface{}{
 		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
 		"token_reviewer_jwt": os.Getenv("TOKEN_REVIEWER_JWT"),
 	})
@@ -150,7 +148,7 @@ func TestSuccessWithTokenReviewerJwt(t *testing.T) {
 }
 
 func TestFailWithBadTokenReviewerJwt(t *testing.T) {
-	deferred, client := setupKubernetesAuth(t, "vault", map[string]interface{}{
+	client, deferred := setupKubernetesAuth(t, "vault", map[string]interface{}{
 		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
 		"token_reviewer_jwt": badTokenReviewerJwt,
 	})
@@ -170,7 +168,7 @@ func TestFailWithBadTokenReviewerJwt(t *testing.T) {
 }
 
 func TestUnauthorizedServiceAccountErrorCode(t *testing.T) {
-	deferred, client := setupKubernetesAuth(t, "badServiceAccount", nil)
+	client, deferred := setupKubernetesAuth(t, "badServiceAccount", nil)
 	defer deferred()
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
