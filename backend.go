@@ -183,8 +183,9 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 	if err != nil {
 		return nil, err
 	}
+	// We know the config is empty so exit early
 	if config == nil {
-		return nil, nil
+		return config, nil
 	}
 	// Nothing more to do if loading local CA cert and JWT token is disabled.
 	if config.DisableLocalCAJwt {

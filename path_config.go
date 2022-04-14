@@ -8,11 +8,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"net/http"
-
 	"github.com/briankassouf/jose/jws"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
+	"net/http"
 )
 
 const (
@@ -159,15 +158,20 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	b.l.Lock()
 	defer b.l.Unlock()
 
-	// If we have a CA cert build the TLSConfig
-	if len(config.CACert) > 0 {
-		certPool := x509.NewCertPool()
+	// Determine if we load the local CA cert or the CA cert provided
+	// by the kubernetes_ca_cert path into the backend's HTTP client
+	certPool := x509.NewCertPool()
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	if disableLocalJWT {
 		certPool.AppendCertsFromPEM([]byte(config.CACert))
+		tlsConfig.RootCAs = certPool
 
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool,
-		}
+		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
+	} else {
+		certPool.AppendCertsFromPEM([]byte(localCACertPath))
+		tlsConfig.RootCAs = certPool
 
 		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}
