@@ -171,7 +171,6 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 
 		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	} else {
-
 		certPool.AppendCertsFromPEM([]byte(localCACertPath))
 		tlsConfig.RootCAs = certPool
 
