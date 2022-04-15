@@ -93,6 +93,8 @@ func setupKubernetesAuth(t *testing.T, boundServiceAccountName string, kubeConfi
 		if panicErr := recover(); panicErr != nil {
 			deferred()
 			panic(panicErr)
+		} else if t.Failed() {
+			deferred()
 		}
 	}()
 
