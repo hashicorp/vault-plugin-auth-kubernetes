@@ -8,10 +8,11 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"github.com/briankassouf/jose/jws"
+	"net/http"
+
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
-	"net/http"
 )
 
 const (
@@ -133,8 +134,8 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
 
 	if tokenReviewer != "" {
-		// Validate it's a JWT
-		_, err := jws.ParseJWT([]byte(tokenReviewer))
+		// Validate it's a JWT, but don't verify the signature, since we may not have the right cert.
+		_, _, err := jwt.NewParser().ParseUnverified(tokenReviewer, jwt.MapClaims{})
 		if err != nil {
 			return nil, err
 		}
@@ -249,10 +250,12 @@ func parsePublicKeyPEM(data []byte) (interface{}, error) {
 	return nil, errors.New("data does not contain any valid RSA or ECDSA public keys")
 }
 
-const confHelpSyn = `Configures the JWT Public Key and Kubernetes API information.`
-const confHelpDesc = `
+const (
+	confHelpSyn  = `Configures the JWT Public Key and Kubernetes API information.`
+	confHelpDesc = `
 The Kubernetes Auth backend validates service account JWTs and verifies their
 existence with the Kubernetes TokenReview API. This endpoint configures the
 public key used to validate the JWT signature and the necessary information to
 access the Kubernetes API.
 `
+)
