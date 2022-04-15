@@ -42,26 +42,7 @@ func tokenReviewAPIFactory(config *kubeConfig) tokenReviewer {
 	}
 }
 
-<<<<<<< HEAD
 func (t *tokenReviewAPI) Review(ctx context.Context, client *http.Client, jwt string, aud []string) (*tokenReviewResult, error) {
-=======
-func (t *tokenReviewAPI) Review(ctx context.Context, jwt string, aud []string) (*tokenReviewResult, error) {
-	client := cleanhttp.DefaultClient()
-
-	// If we have a CA cert build the TLSConfig
-	if len(t.config.CACert) > 0 {
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM([]byte(t.config.CACert))
-
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool,
-		}
-
-		client.Transport.(*http.Transport).TLSClientConfig = tlsConfig
-	}
->>>>>>> main
-
 	// Create the TokenReview Object and marshal it into json
 	trReq := &authv1.TokenReview{
 		Spec: authv1.TokenReviewSpec{
@@ -181,7 +162,6 @@ type mockTokenReview struct {
 
 func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
 	return func(config *kubeConfig) tokenReviewer {
-
 		return &mockTokenReview{
 			saName:      name,
 			saNamespace: namespace,
