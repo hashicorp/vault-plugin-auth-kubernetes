@@ -6,12 +6,12 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/go-cleanhttp"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -177,7 +177,9 @@ func (b *kubeAuthBackend) config(ctx context.Context, s logical.Storage) (*kubeC
 }
 
 // loadConfig fetches the kubeConfig from storage and optionally decorates it with
-// local token and CA certificate.
+// local token and CA certificate. Since loadConfig does not return an error if the kubeConfig reference
+// is nil, we should nil-check. This behavior exists to allow loadConfig's caller to
+// make a decision based on the returned reference.
 func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*kubeConfig, error) {
 	config, err := b.config(ctx, s)
 	if err != nil {
