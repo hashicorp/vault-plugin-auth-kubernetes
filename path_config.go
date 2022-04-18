@@ -165,7 +165,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	if disableLocalJWT {
+	if disableLocalJWT || len(caCert) > 0 {
 		certPool.AppendCertsFromPEM([]byte(config.CACert))
 		tlsConfig.RootCAs = certPool
 
