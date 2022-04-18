@@ -58,9 +58,9 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 
 	// test no certificate
 	data := map[string]interface{}{
-		"pem_keys":             config.pems,
-		"kubernetes_host":      "host",
-		"kubernetes_ca_cert":   testCACert,
+		"pem_keys":           config.pems,
+		"kubernetes_host":    "host",
+		"kubernetes_ca_cert": testCACert,
 	}
 
 	req := &logical.Request{
