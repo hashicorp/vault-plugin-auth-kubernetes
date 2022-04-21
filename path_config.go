@@ -178,7 +178,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 
 		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}
-	
+
 	var err error
 	for i, pem := range pemList {
 		config.PublicKeys[i], err = parsePublicKeyPEM([]byte(pem))
