@@ -37,6 +37,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Kubernetes CA Certificate",
 				},
+				Required: false,
 			},
 			"token_reviewer_jwt": {
 				Type: framework.TypeString,
@@ -141,10 +142,6 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		}
 	}
 
-	if disableLocalJWT && caCert == "" {
-		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
-	}
-
 	config := &kubeConfig{
 		PublicKeys:           make([]interface{}, len(pemList)),
 		PEMKeys:              pemList,
@@ -181,7 +178,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 
 		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}
-
+	
 	var err error
 	for i, pem := range pemList {
 		config.PublicKeys[i], err = parsePublicKeyPEM([]byte(pem))
