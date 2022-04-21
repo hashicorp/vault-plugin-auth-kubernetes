@@ -57,7 +57,9 @@ extracted. Not every installation of Kubernetes exposes these keys.`,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Service account verification keys",
 				},
+				Required: false,
 			},
+
 			"issuer": {
 				Type:       framework.TypeString,
 				Deprecated: true,
