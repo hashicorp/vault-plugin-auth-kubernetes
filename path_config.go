@@ -33,7 +33,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 
 			"kubernetes_ca_cert": {
 				Type:        framework.TypeString,
-				Description: "PEM encoded CA cert for use by the TLS client used to talk with the API.",
+				Description: "Optional PEM encoded CA cert for use by the TLS client used to talk with the API.",
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Kubernetes CA Certificate",
 				},
@@ -59,7 +59,6 @@ extracted. Not every installation of Kubernetes exposes these keys.`,
 				},
 				Required: false,
 			},
-
 			"issuer": {
 				Type:       framework.TypeString,
 				Deprecated: true,
@@ -160,11 +159,11 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 
 	// Determine if we load the local CA cert or the CA cert provided
 	// by the kubernetes_ca_cert path into the backend's HTTP client
-	certPool := x509.NewCertPool()
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
 	if disableLocalJWT || len(caCert) > 0 {
+		certPool := x509.NewCertPool()
 		certPool.AppendCertsFromPEM([]byte(config.CACert))
 		tlsConfig.RootCAs = certPool
 
@@ -174,7 +173,10 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		if err != nil {
 			return nil, err
 		}
-
+		certPool, err := x509.SystemCertPool()
+		if err != nil {
+			certPool = x509.NewCertPool()
+		}
 		certPool.AppendCertsFromPEM([]byte(localCACert))
 		tlsConfig.RootCAs = certPool
 
