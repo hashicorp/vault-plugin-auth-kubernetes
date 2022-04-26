@@ -544,7 +544,7 @@ func TestConfig_SystemCa(t *testing.T) {
 		"no CA default to system": {
 			config: map[string]interface{}{
 				"kubernetes_host":      "host",
-				"disable_local_ca_jwt": true,
+				"disable_local_ca_jwt": false,
 				"kubernetes_ca_cert":   "",
 			},
 			setupInClusterFiles: true,
@@ -556,7 +556,7 @@ func TestConfig_SystemCa(t *testing.T) {
 				CACert:               testLocalCACert,
 				TokenReviewerJWT:     testLocalJWT,
 				DisableISSValidation: true,
-				DisableLocalCAJwt:    true,
+				DisableLocalCAJwt:    false,
 			},
 		},
 	}
