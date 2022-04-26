@@ -535,17 +535,21 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 	}
 }
 
-func TestConfig_SystemCaJWT(t *testing.T) {
+func TestConfig_SystemCa(t *testing.T) {
 	testCases := map[string]struct {
 		config              map[string]interface{}
 		setupInClusterFiles bool
 		expected            *kubeConfig
 	}{
-		"no CA or JWT, default to system": {
+		"no CA default to system": {
 			config: map[string]interface{}{
 				"kubernetes_host": "host",
+				"disable_local_ca_jwt": true,
+				"kubernetes_ca_cert":    "",
+
 			},
 			setupInClusterFiles: true,
+
 			expected: &kubeConfig{
 				PublicKeys:           []interface{}{},
 				PEMKeys:              []string{},
