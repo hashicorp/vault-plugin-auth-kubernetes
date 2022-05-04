@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
@@ -40,24 +41,7 @@ var (
 	testProjectedUID         = "77c81ad7-1bea-4d94-9ca5-f5d7f3632331"
 	testProjectedMockFactory = mockTokenReviewFactory(testProjectedName, testNamespace, testProjectedUID)
 
-	// generate with: openssl ecparam -genkey -name prime256v1
-	ecdsaPrivateKeyText = `-----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIJ0PdVPlTVsR1ZS8C//n84b9EmfvvKcpLe0RNjzZ2qvloAoGCCqGSM49
-AwEHoUQDQgAEFowFkTnVaj/qxMRSLGOgN4rzkpyNFW6cCAsF1KowSDLj0eeZg5SL
-gfLYniWbIKVKiajK6X3qYpWHMbABQRLLBA==
------END EC PRIVATE KEY-----`
-	// generate with: openssl ec -in (key-from-above-in-a-file) -pubout
-	ecdsaPublicKeyText = `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEFowFkTnVaj/qxMRSLGOgN4rzkpyN
-FW6cCAsF1KowSDLj0eeZg5SLgfLYniWbIKVKiajK6X3qYpWHMbABQRLLBA==
------END PUBLIC KEY-----`
-	ecdsaOtherPrivateKeyText = `-----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIMtZ+agmtCe9uP4QQ7TdFydpSrxWv83Q3QFo9RD8m0JvoAoGCCqGSM49
-AwEHoUQDQgAEj8L+m0cBNiI1T/01Bm5cOOtNSyyx26/2DUfq7HY7JY62J5ywNUGS
-x4hfKwpztAOo3mw/mItYWdZm1ZBVsgfmsw==
------END EC PRIVATE KEY-----`
-	testDefaultPEMs = []string{ecdsaPublicKeyText}
-
+	testDefaultPEMs      []string
 	ecdsaPrivateKey      *ecdsa.PrivateKey
 	ecdsaOtherPrivateKey *ecdsa.PrivateKey
 
@@ -142,24 +126,23 @@ x4hfKwpztAOo3mw/mItYWdZm1ZBVsgfmsw==
 )
 
 func init() {
-	block, data := pem.Decode([]byte(ecdsaPrivateKeyText))
-	if len(data) != 0 {
-		panic(fmt.Errorf("too much data in private key"))
-	}
 	var err error
-	ecdsaPrivateKey, err = x509.ParseECPrivateKey(block.Bytes)
+	ecdsaPrivateKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	ecdsaOtherPrivateKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		panic(err)
 	}
 
-	block, data = pem.Decode([]byte(ecdsaOtherPrivateKeyText))
-	if len(data) != 0 {
-		panic(fmt.Errorf("too much data in private key"))
-	}
-	ecdsaOtherPrivateKey, err = x509.ParseECPrivateKey(block.Bytes)
-	if err != nil {
-		panic(err)
-	}
+	var blockBytes []byte
+	blockBytes, err = x509.MarshalPKIXPublicKey(ecdsaPrivateKey.Public())
+	ecdsaPublicKeyText := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: blockBytes,
+	})
+	testDefaultPEMs = []string{string(ecdsaPublicKeyText)}
 
 	jwtGoodDataToken = jwtSign(jwtES256Header, patchIat(jwtGoodDataPayload), ecdsaPrivateKey)
 	jwtBadServiceAccountToken = jwtSign(jwtES256Header, patchIat(jwtBadServiceAccountPayload), ecdsaPrivateKey)
@@ -500,7 +483,7 @@ func TestLogin_ECDSA_PEM(t *testing.T) {
 
 	// test no certificate
 	data := map[string]interface{}{
-		"pem_keys":           []string{ecdsaPublicKeyText},
+		"pem_keys":           testDefaultPEMs,
 		"kubernetes_host":    "host",
 		"kubernetes_ca_cert": testCACert,
 	}
