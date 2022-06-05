@@ -87,6 +87,7 @@ then this plugin will use kubernetes.io/serviceaccount as the default issuer.
 			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
+			logical.PatchOperation:  b.pathConfigPatch,
 			logical.UpdateOperation: b.pathConfigWrite,
 			logical.CreateOperation: b.pathConfigWrite,
 			logical.ReadOperation:   b.pathConfigRead,
@@ -122,39 +123,65 @@ func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Reque
 
 // pathConfigWrite handles create and update commands to the config
 func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	host := data.Get("kubernetes_host").(string)
-	if host == "" {
+	config := &kubeConfig{
+		DisableISSValidation: true,
+	}
+	return b.updateConfig(ctx, config, req, data)
+}
+
+func (b *kubeAuthBackend) pathConfigPatch(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	config, err := b.config(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	} else if config == nil {
+		return logical.ErrorResponse("No config to update"), nil
+	}
+
+	return b.updateConfig(ctx, config, req, data)
+}
+
+func (b *kubeAuthBackend) updateConfig(ctx context.Context, config *kubeConfig, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	if v, ok := data.GetOk("kubernetes_host"); ok {
+		config.Host = v.(string)
+	}
+	if v, ok := data.GetOk("disable_local_ca_jwt"); ok {
+		config.DisableLocalCAJwt = v.(bool)
+	}
+	if v, ok := data.GetOk("pem_keys"); ok {
+		config.PEMKeys = v.([]string)
+	}
+	if v, ok := data.GetOk("kubernetes_ca_cert"); ok {
+		config.CACert = v.(string)
+	}
+	if v, ok := data.GetOk("issuer"); ok {
+		config.Issuer = v.(string)
+	}
+	if v, ok := data.GetOk("disable_iss_validation"); ok {
+		config.DisableISSValidation = v.(bool)
+	}
+	if v, ok := data.GetOk("token_reviewer_jwt"); ok {
+		config.TokenReviewerJWT = v.(string)
+	}
+
+	if config.Host == "" {
 		return logical.ErrorResponse("no host provided"), nil
 	}
 
-	disableLocalJWT := data.Get("disable_local_ca_jwt").(bool)
-	pemList := data.Get("pem_keys").([]string)
-	caCert := data.Get("kubernetes_ca_cert").(string)
-	issuer := data.Get("issuer").(string)
-	disableIssValidation := data.Get("disable_iss_validation").(bool)
-	tokenReviewer := data.Get("token_reviewer_jwt").(string)
-
-	if tokenReviewer != "" {
+	if config.TokenReviewerJWT != "" {
 		// Validate it's a JWT, but don't verify the signature, since we may not have the right cert.
-		_, err := josejwt.ParseSigned(tokenReviewer)
-		if err != nil {
-			return nil, err
+		if _, err := josejwt.ParseSigned(config.TokenReviewerJWT); err != nil {
+			return logical.ErrorResponse(`Failed to valide token_reviewer_jwt: %s`, err), err
 		}
 	}
 
-	if disableLocalJWT && caCert == "" {
+	if config.DisableLocalCAJwt && config.CACert == "" {
 		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
 	}
 
-	config := &kubeConfig{
-		PublicKeys:           make([]crypto.PublicKey, len(pemList)),
-		PEMKeys:              pemList,
-		Host:                 host,
-		CACert:               caCert,
-		TokenReviewerJWT:     tokenReviewer,
-		Issuer:               issuer,
-		DisableISSValidation: disableIssValidation,
-		DisableLocalCAJwt:    disableLocalJWT,
+	config.PublicKeys = make([]crypto.PublicKey, len(config.PEMKeys))
+
+	if config.PEMKeys == nil {
+		config.PEMKeys = []string{}
 	}
 
 	b.l.Lock()
@@ -166,7 +193,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	if disableLocalJWT || len(caCert) > 0 {
+	if config.DisableLocalCAJwt || len(config.CACert) > 0 {
 		certPool.AppendCertsFromPEM([]byte(config.CACert))
 		tlsConfig.RootCAs = certPool
 
@@ -184,7 +211,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	}
 
 	var err error
-	for i, pem := range pemList {
+	for i, pem := range config.PEMKeys {
 		config.PublicKeys[i], err = parsePublicKeyPEM([]byte(pem))
 		if err != nil {
 			return logical.ErrorResponse(err.Error()), nil
@@ -228,7 +255,7 @@ type kubeConfig struct {
 
 // PasrsePublicKeyPEM is used to parse RSA and ECDSA public keys from PEMs
 func parsePublicKeyPEM(data []byte) (crypto.PublicKey, error) {
-	block, data := pem.Decode(data)
+	block, _ := pem.Decode(data)
 	if block != nil {
 		var rawKey interface{}
 		var err error

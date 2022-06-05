@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-test/deep"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
@@ -481,7 +482,7 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 	token2 := "after-renewal"
 
 	// Write initial token to the temp file.
-	ioutil.WriteFile(f.Name(), []byte(token1), 0644)
+	ioutil.WriteFile(f.Name(), []byte(token1), 0o644)
 
 	data := map[string]interface{}{
 		"kubernetes_host": "host",
@@ -510,7 +511,7 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 	}
 
 	// Write new value to the token file to simulate renewal.
-	ioutil.WriteFile(f.Name(), []byte(token2), 0644)
+	ioutil.WriteFile(f.Name(), []byte(token2), 0o644)
 
 	// Load again to check we still got the old cached token from memory.
 	conf, err = b.(*kubeAuthBackend).loadConfig(context.Background(), storage)
@@ -533,6 +534,132 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 
 	if conf.TokenReviewerJWT != token2 {
 		t.Fatalf("got unexpected JWT: expected %#v\n got %#v\n", token2, conf.TokenReviewerJWT)
+	}
+}
+
+func TestConfig_Patch(t *testing.T) {
+	b, storage := getBackend(t)
+
+	cleanup := setupLocalFiles(t, b)
+	defer cleanup()
+
+	cases := map[string]struct {
+		initialConfig map[string]interface{}
+		patchConfig   map[string]interface{}
+		expectError   string
+		finalConfig   *kubeConfig
+	}{
+		"missing-config": {
+			expectError: "No config to update",
+		},
+		"update-disable_iss_validation": {
+			initialConfig: map[string]interface{}{
+				"pem_keys":               []string{testRSACert, testECCert},
+				"kubernetes_host":        "host",
+				"kubernetes_ca_cert":     testCACert,
+				"issuer":                 "",
+				"disable_iss_validation": false,
+				"disable_local_ca_jwt":   false,
+			},
+			patchConfig: map[string]interface{}{
+				"disable_iss_validation": true,
+			},
+			finalConfig: &kubeConfig{
+				Host:                 "host",
+				CACert:               testCACert,
+				PEMKeys:              []string{testRSACert, testECCert},
+				DisableISSValidation: true,
+			},
+		},
+		"update-disable_local_ca_jwt": {
+			initialConfig: map[string]interface{}{
+				"pem_keys":               []string{testRSACert, testECCert},
+				"kubernetes_host":        "host",
+				"kubernetes_ca_cert":     testCACert,
+				"issuer":                 "",
+				"disable_iss_validation": false,
+				"disable_local_ca_jwt":   false,
+			},
+			patchConfig: map[string]interface{}{
+				"disable_local_ca_jwt": true,
+			},
+			finalConfig: &kubeConfig{
+				Host:              "host",
+				CACert:            testCACert,
+				PEMKeys:           []string{testRSACert, testECCert},
+				DisableLocalCAJwt: true,
+			},
+		},
+		"update-host": {
+			initialConfig: map[string]interface{}{
+				"pem_keys":               []string{testRSACert, testECCert},
+				"kubernetes_host":        "host",
+				"kubernetes_ca_cert":     testCACert,
+				"issuer":                 "",
+				"disable_iss_validation": false,
+				"disable_local_ca_jwt":   false,
+			},
+			patchConfig: map[string]interface{}{
+				"kubernetes_host": "",
+			},
+			expectError: "no host provided",
+			finalConfig: &kubeConfig{
+				Host:    "host",
+				CACert:  testCACert,
+				PEMKeys: []string{testRSACert, testECCert},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if tc.initialConfig != nil {
+				resp, err := b.HandleRequest(context.Background(), &logical.Request{
+					Operation: logical.CreateOperation,
+					Path:      configPath,
+					Storage:   storage,
+					Data:      tc.initialConfig,
+				})
+				if err != nil || (resp != nil && resp.IsError()) {
+					t.Fatalf("err:%s resp:%#v\n", err, resp)
+				}
+			}
+
+			resp, err := b.HandleRequest(context.Background(), &logical.Request{
+				Operation: logical.PatchOperation,
+				Path:      configPath,
+				Storage:   storage,
+				Data:      tc.patchConfig,
+			})
+			if tc.expectError == "" {
+				if err != nil || (resp != nil && resp.IsError()) {
+					t.Fatalf("err:%s resp:%#v\n", err, resp)
+				}
+			} else {
+				if err == nil && (resp == nil || !resp.IsError()) {
+					t.Fatal("was expecting an error but got none")
+				} else {
+					if err == nil {
+						err = resp.Error()
+					}
+					if err.Error() != tc.expectError {
+						t.Fatalf("err:%#v expected:%#v\n", err.Error(), tc.expectError)
+					}
+				}
+			}
+			config, err := b.(*kubeAuthBackend).config(context.Background(), storage)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			expected := tc.finalConfig
+			if expected != nil {
+				expected.PublicKeys = config.PublicKeys
+			}
+			if diff := deep.Equal(expected, config); diff != nil {
+				t.Fatal(diff)
+			}
+		})
 	}
 }
 
