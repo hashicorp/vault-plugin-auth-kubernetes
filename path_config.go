@@ -123,24 +123,25 @@ func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Reque
 
 // pathConfigWrite handles create and update commands to the config
 func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	config := &kubeConfig{
-		DisableISSValidation: true,
-	}
-	return b.updateConfig(ctx, config, req, data)
+	return b.updateConfig(ctx, nil, req, data)
 }
 
 func (b *kubeAuthBackend) pathConfigPatch(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	config, err := b.config(ctx, req.Storage)
 	if err != nil {
 		return nil, err
-	} else if config == nil {
-		return logical.ErrorResponse("No config to update"), nil
 	}
 
 	return b.updateConfig(ctx, config, req, data)
 }
 
 func (b *kubeAuthBackend) updateConfig(ctx context.Context, config *kubeConfig, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	if config == nil {
+		config = &kubeConfig{
+			DisableISSValidation: true,
+		}
+	}
+
 	if v, ok := data.GetOk("kubernetes_host"); ok {
 		config.Host = v.(string)
 	}

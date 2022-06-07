@@ -550,7 +550,7 @@ func TestConfig_Patch(t *testing.T) {
 		finalConfig   *kubeConfig
 	}{
 		"missing-config": {
-			expectError: "No config to update",
+			expectError: "no host provided",
 		},
 		"update-disable_iss_validation": {
 			initialConfig: map[string]interface{}{
