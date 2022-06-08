@@ -422,6 +422,22 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				DisableLocalCAJwt:    true,
 			},
 		},
+		"outside cluster, no CA, local not disabled": {
+			config: map[string]interface{}{
+				"kubernetes_host":    "host",
+				"token_reviewer_jwt": jwtGoodDataToken,
+			},
+			setupInClusterFiles: false,
+			expected: &kubeConfig{
+				PublicKeys:           []crypto.PublicKey{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               "",
+				TokenReviewerJWT:     jwtGoodDataToken,
+				DisableISSValidation: true,
+				DisableLocalCAJwt:    false,
+			},
+		},
 	}
 
 	for name, tc := range testCases {
