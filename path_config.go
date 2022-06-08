@@ -166,7 +166,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	if disableLocalJWT || len(caCert) > 0 {
+	if disableLocalJWT || config.CACert != "" {
 		certPool.AppendCertsFromPEM([]byte(config.CACert))
 		tlsConfig.RootCAs = certPool
 
@@ -174,11 +174,11 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	} else {
 		localCACert, err := b.localCACertReader.ReadFile()
 		if err != nil {
-			return nil, err
+			b.Logger().Debug("failed to read local CA, falling back to system certificates", "error", err)
+		} else {
+			certPool.AppendCertsFromPEM([]byte(localCACert))
+			tlsConfig.RootCAs = certPool
 		}
-
-		certPool.AppendCertsFromPEM([]byte(localCACert))
-		tlsConfig.RootCAs = certPool
 
 		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 	}

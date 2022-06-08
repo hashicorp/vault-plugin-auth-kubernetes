@@ -208,9 +208,10 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 	// Read local CA cert unless it was stored in config.
 	// Else build the TLSConfig with the trusted CA cert and load into client
 	if config.CACert == "" {
-		config.CACert, err = b.localCACertReader.ReadFile()
-		if err != nil {
-			return nil, err
+		if caCert, err := b.localCACertReader.ReadFile(); err != nil {
+			b.Logger().Debug("failed to read local CA, falling back to system certificates", "error", err)
+		} else {
+			config.CACert = caCert
 		}
 	}
 
