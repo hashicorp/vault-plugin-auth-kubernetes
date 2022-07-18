@@ -3,6 +3,7 @@ package kubeauth
 import (
 	"context"
 	"crypto"
+	"github.com/hashicorp/vault/sdk/helper/tokenutil"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -533,6 +534,61 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 
 	if conf.TokenReviewerJWT != token2 {
 		t.Fatalf("got unexpected JWT: expected %#v\n got %#v\n", token2, conf.TokenReviewerJWT)
+	}
+}
+
+func TestResolveRole(t *testing.T) {
+	b, storage := getBackend(t)
+	role := "testrole"
+
+	validRoleStorageEntry := &roleStorageEntry{
+		TokenParams: tokenutil.TokenParams{
+			TokenPolicies:   []string{"test"},
+			TokenPeriod:     3 * time.Second,
+			TokenTTL:        1 * time.Second,
+			TokenMaxTTL:     5 * time.Second,
+			TokenNumUses:    12,
+			TokenBoundCIDRs: nil,
+		},
+		Policies:                 []string{"test"},
+		Period:                   3 * time.Second,
+		ServiceAccountNames:      []string{"name"},
+		ServiceAccountNamespaces: []string{"namespace"},
+		TTL:                      1 * time.Second,
+		MaxTTL:                   5 * time.Second,
+		NumUses:                  12,
+		BoundCIDRs:               nil,
+		AliasNameSource:          aliasNameSourceDefault,
+	}
+
+	entry, err := logical.StorageEntryJSON("role/"+role, validRoleStorageEntry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := storage.Put(context.TODO(), entry); err != nil {
+		t.Fatal(err)
+	}
+
+	loginData := map[string]interface{}{
+		"role": role,
+	}
+	loginReq := &logical.Request{
+		Operation: logical.ResolveRoleOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      loginData,
+		Connection: &logical.Connection{
+			RemoteAddr: "127.0.0.1",
+		},
+	}
+
+	resp, err := b.HandleRequest(context.Background(), loginReq)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%v resp:%#v", err, resp)
+	}
+
+	if resp.Data["role"] != role {
+		t.Fatalf("Role was not as expected. Expected %s, received %s", role, resp.Data["role"])
 	}
 }
 
