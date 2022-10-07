@@ -228,31 +228,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	}
 
 	// Handle upgrade cases
-	{
-		if err := tokenutil.UpgradeValue(data, "policies", "token_policies", &role.Policies, &role.TokenPolicies); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "bound_cidrs", "token_bound_cidrs", &role.BoundCIDRs, &role.TokenBoundCIDRs); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "num_uses", "token_num_uses", &role.NumUses, &role.TokenNumUses); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "ttl", "token_ttl", &role.TTL, &role.TokenTTL); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "max_ttl", "token_max_ttl", &role.MaxTTL, &role.TokenMaxTTL); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "period", "token_period", &role.Period, &role.TokenPeriod); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-	}
+	role.handleLegacyFieldDefinitions(data)
 
 	if err := role.validateTokenLifetimes(b); err != nil {
 		return err, nil
@@ -318,31 +294,7 @@ func (b *kubeAuthBackend) pathRolePatch(ctx context.Context, req *logical.Reques
 	}
 
 	// Handle upgrade cases
-	{
-		if err := tokenutil.UpgradeValue(data, "policies", "token_policies", &role.Policies, &role.TokenPolicies); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "bound_cidrs", "token_bound_cidrs", &role.BoundCIDRs, &role.TokenBoundCIDRs); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "num_uses", "token_num_uses", &role.NumUses, &role.TokenNumUses); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "ttl", "token_ttl", &role.TTL, &role.TokenTTL); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "max_ttl", "token_max_ttl", &role.MaxTTL, &role.TokenMaxTTL); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "period", "token_period", &role.Period, &role.TokenPeriod); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-	}
+	role.handleLegacyFieldDefinitions(data)
 
 	if err := role.validateTokenLifetimes(b); err != nil {
 		return err, nil
@@ -404,6 +356,33 @@ func (b *kubeAuthBackend) pathRolePatch(ctx context.Context, req *logical.Reques
 	}
 
 	return resp, nil
+}
+
+func (role *roleStorageEntry) handleLegacyFieldDefinitions(data *framework.FieldData) *logical.Response {
+	if err := tokenutil.UpgradeValue(data, "policies", "token_policies", &role.Policies, &role.TokenPolicies); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "bound_cidrs", "token_bound_cidrs", &role.BoundCIDRs, &role.TokenBoundCIDRs); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "num_uses", "token_num_uses", &role.NumUses, &role.TokenNumUses); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "ttl", "token_ttl", &role.TTL, &role.TokenTTL); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "max_ttl", "token_max_ttl", &role.MaxTTL, &role.TokenMaxTTL); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "period", "token_period", &role.Period, &role.TokenPeriod); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+	return nil
 }
 
 func (role *roleStorageEntry) validateTokenLifetimes(backend *kubeAuthBackend) *logical.Response {
