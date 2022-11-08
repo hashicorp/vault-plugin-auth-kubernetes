@@ -536,6 +536,65 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 	}
 }
 
+func TestConfig_SystemCa(t *testing.T) {
+	testCases := map[string]struct {
+		config              map[string]interface{}
+		setupInClusterFiles bool
+		expected            *kubeConfig
+	}{
+		"no CA default to system": {
+			config: map[string]interface{}{
+				"kubernetes_host":      "host",
+				"disable_local_ca_jwt": false,
+				"kubernetes_ca_cert":   "",
+			},
+			setupInClusterFiles: true,
+
+			expected: &kubeConfig{
+				PublicKeys:           []interface{}{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               testLocalCACert,
+				TokenReviewerJWT:     testLocalJWT,
+				DisableISSValidation: true,
+				DisableLocalCAJwt:    false,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			b, storage := getBackend(t)
+
+			if tc.setupInClusterFiles {
+				cleanup := setupLocalFiles(t, b)
+				defer cleanup()
+			}
+
+			req := &logical.Request{
+				Operation: logical.CreateOperation,
+				Path:      configPath,
+				Storage:   storage,
+				Data:      tc.config,
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
+
+			conf, err := b.(*kubeAuthBackend).loadConfig(context.Background(), storage)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !reflect.DeepEqual(tc.expected, conf) {
+				t.Fatalf("expected did not match actual: expected %#v\n got %#v\n", tc.expected, conf)
+			}
+		})
+	}
+}
+
 var testLocalCACert string = `-----BEGIN CERTIFICATE-----
 MIIDVDCCAjwCCQDFiyFY1M6afTANBgkqhkiG9w0BAQsFADBsMQswCQYDVQQGEwJV
 UzETMBEGA1UECAwKV2FzaGluZ3RvbjEQMA4GA1UEBwwHU2VhdHRsZTEgMB4GA1UE
