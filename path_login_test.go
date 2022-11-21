@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -516,6 +517,93 @@ func TestLogin_ECDSA_PEM(t *testing.T) {
 			RemoteAddr: "127.0.0.1",
 		},
 	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+}
+
+func TestLogin_LocalCACertChange(t *testing.T) {
+	config := defaultTestBackendConfig()
+	b, storage := getBackend(t)
+
+	cert, err := os.CreateTemp("", "ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		os.Remove(cert.Name())
+	}()
+
+	cert.WriteString(testLocalCACert)
+	cert.Close()
+
+	noCache := 0 * time.Second
+	b.(*kubeAuthBackend).localCACertReader = newCachingFileReader(cert.Name(), noCache, time.Now)
+
+	data := map[string]interface{}{
+		"kubernetes_host": "host",
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "config",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	data = map[string]interface{}{
+		"bound_service_account_names":      config.saName,
+		"bound_service_account_namespaces": config.saNamespace,
+		"policies":                         "test",
+		"period":                           "3s",
+		"ttl":                              "1s",
+		"num_uses":                         12,
+		"max_ttl":                          "5s",
+		"alias_name_source":                config.aliasNameSource,
+	}
+
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "role/plugin-test",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	b.(*kubeAuthBackend).reviewFactory = testMockFactory
+
+	// test successful login
+	data = map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  jwtGoodDataToken,
+	}
+
+	req = &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// change CA and test successful login again
+	os.WriteFile(cert.Name(), []byte(testCACert), 0644)
 
 	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {

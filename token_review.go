@@ -3,6 +3,7 @@ package kubeauth
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -158,6 +159,7 @@ type mockTokenReview struct {
 	saName      string
 	saNamespace string
 	saUID       string
+	config      *kubeConfig
 }
 
 func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
@@ -166,6 +168,7 @@ func mockTokenReviewFactory(name, namespace, UID string) tokenReviewFactory {
 			saName:      name,
 			saNamespace: namespace,
 			saUID:       UID,
+			config:      config,
 		}
 	}
 }
@@ -181,6 +184,16 @@ func (t *mockTokenReview) Review(ctx context.Context, client *http.Client, cjwt 
 	}
 	if httpTransport.DisableKeepAlives {
 		return nil, errors.New("expected DisableKeepAlives to be false but was true")
+	}
+
+	// Check that the CA certificate in the config has been configured to the HTTP client
+	configCertPool := x509.NewCertPool()
+	if t.config.CACert != "" {
+		configCertPool.AppendCertsFromPEM([]byte(t.config.CACert))
+	}
+
+	if !httpTransport.TLSClientConfig.RootCAs.Equal(configCertPool) {
+		return nil, errors.New("cert pools do not match, the CA certificate used by http client and config differs")
 	}
 
 	return &tokenReviewResult{

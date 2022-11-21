@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -108,7 +109,6 @@ func Backend() *kubeAuthBackend {
 			},
 			pathsRole(b),
 		),
-		InitializeFunc: b.initialize,
 	}
 
 	// Set default HTTP client
@@ -120,31 +120,21 @@ func Backend() *kubeAuthBackend {
 	return b
 }
 
-// initialize is used to handle the state of config values just after the K8s plugin has been mounted
-func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
-	// Try to load the config on initialization
-	config, err := b.loadConfig(ctx, req.Storage)
-	if err != nil {
-		return err
-	}
-	if config == nil {
-		return nil
+func (b *kubeAuthBackend) updateHTTPClient(config *kubeConfig) error {
+	certPool := x509.NewCertPool()
+	ok := certPool.AppendCertsFromPEM([]byte(config.CACert))
+	if !ok {
+		return errors.New("backend configuration error, bad CA certificate")
 	}
 
-	b.l.Lock()
-	defer b.l.Unlock()
-	// If we have a CA cert build the TLSConfig
-	if len(config.CACert) > 0 {
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM([]byte(config.CACert))
-
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool,
-		}
-
-		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    certPool,
 	}
+
+	// Actual HTTP connections are not destroyed, so the TLS config
+	// takes effect when a new connection is established
+	b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
 
 	return nil
 }
@@ -188,7 +178,7 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 	}
 	// We know the config is empty so exit early
 	if config == nil {
-		return config, nil
+		return nil, nil
 	}
 	// Nothing more to do if loading local CA cert and JWT token is disabled.
 	if config.DisableLocalCAJwt {

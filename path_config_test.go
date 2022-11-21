@@ -143,6 +143,27 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
+	// test invalid ca
+	data = map[string]interface{}{
+		"kubernetes_ca_cert": "bad",
+		"kubernetes_host":    "host",
+	}
+
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      configPath,
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, _ = b.HandleRequest(context.Background(), req)
+	if resp == nil || !resp.IsError() {
+		t.Fatal("expected error")
+	}
+	if resp.Error().Error() != "kubernetes_ca_cert contains an invalid CA certificate" {
+		t.Fatalf("got unexpected error: %v", resp.Error())
+	}
+
 	// Test success with no certs
 	data = map[string]interface{}{
 		"kubernetes_host":    "host",
@@ -536,6 +557,7 @@ func TestConfig_LocalJWTRenewal(t *testing.T) {
 	}
 }
 
+// Subject: C = US, ST = Washington, L = Seattle, O = Vault Testing Authority, CN = example.net
 var testLocalCACert string = `-----BEGIN CERTIFICATE-----
 MIIDVDCCAjwCCQDFiyFY1M6afTANBgkqhkiG9w0BAQsFADBsMQswCQYDVQQGEwJV
 UzETMBEGA1UECAwKV2FzaGluZ3RvbjEQMA4GA1UEBwwHU2VhdHRsZTEgMB4GA1UE
@@ -597,6 +619,7 @@ srxZG4EwDAYDVR0TBAUwAwEB/zAJBgcqhkjOPQQBA2gAMGUCMCR+CvAoNBhqSe2M
 GxqJpa7Onn15Hu8zTsdzeYBqUUXA6wtn+Pa7197CgUkfty9yc2eeQw==
 -----END CERTIFICATE-----`
 
+// Subject: CN = minikubeCA
 var testCACert string = `
 -----BEGIN CERTIFICATE-----
 MIIC5zCCAc+gAwIBAgIBATANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDEwptaW5p

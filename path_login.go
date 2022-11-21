@@ -115,6 +115,11 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, errors.New("could not load backend configuration")
 	}
 
+	err = b.updateHTTPClient(config)
+	if err != nil {
+		return nil, err
+	}
+
 	serviceAccount, err := b.parseAndValidateJWT(jwtStr, role, config)
 	if err != nil {
 		if err == jose.ErrCryptoFailure || strings.Contains(err.Error(), "verifying token signature") {

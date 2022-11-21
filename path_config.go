@@ -5,11 +5,9 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"net/http"
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -146,6 +144,15 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
 	}
 
+	if caCert != "" {
+		// Verify that it is a correctly-formatted CA certificate
+		certPool := x509.NewCertPool()
+		ok := certPool.AppendCertsFromPEM([]byte(caCert))
+		if !ok {
+			return logical.ErrorResponse("kubernetes_ca_cert contains an invalid CA certificate"), nil
+		}
+	}
+
 	config := &kubeConfig{
 		PublicKeys:           make([]crypto.PublicKey, len(pemList)),
 		PEMKeys:              pemList,
@@ -159,29 +166,6 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 
 	b.l.Lock()
 	defer b.l.Unlock()
-
-	// Determine if we load the local CA cert or the CA cert provided
-	// by the kubernetes_ca_cert path into the backend's HTTP client
-	certPool := x509.NewCertPool()
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
-	if disableLocalJWT || len(caCert) > 0 {
-		certPool.AppendCertsFromPEM([]byte(config.CACert))
-		tlsConfig.RootCAs = certPool
-
-		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
-	} else {
-		localCACert, err := b.localCACertReader.ReadFile()
-		if err != nil {
-			return nil, err
-		}
-
-		certPool.AppendCertsFromPEM([]byte(localCACert))
-		tlsConfig.RootCAs = certPool
-
-		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
-	}
 
 	var err error
 	for i, pem := range pemList {
