@@ -289,7 +289,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, jwtStr string
 	}
 
 	if config.EnableCustomMetadataFromAnnotations {
-		annotations, err := b.serviceAccountReaderFactory(config).ReadAnnotations(ctx, sa.Name, sa.Namespace)
+		annotations, err := b.serviceAccountReaderFactory(config).ReadAnnotations(ctx, sa.name(), sa.namespace())
 		if err != nil {
 			return nil, fmt.Errorf("failed to read serviceaccount annotations: %v", err)
 		}
