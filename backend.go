@@ -8,8 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
@@ -53,6 +56,9 @@ type kubeAuthBackend struct {
 	// default HTTP client for connection reuse
 	httpClient *http.Client
 
+	// tlsConfig is periodically updated whenever the CA certificate configuration changes.
+	tlsConfig *tls.Config
+
 	// reviewFactory is used to configure the strategy for doing a token review.
 	// Currently the only options are using the kubernetes API or mocking the
 	// review. Mocks should only be used in tests.
@@ -83,10 +89,22 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 	return b, nil
 }
 
+var getDefaultHTTPClient = cleanhttp.DefaultPooledClient
+
+func defaultTLSConfig() *tls.Config {
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+}
+
 func Backend() *kubeAuthBackend {
 	b := &kubeAuthBackend{
 		localSATokenReader: newCachingFileReader(localJWTPath, jwtReloadPeriod, time.Now),
 		localCACertReader:  newCachingFileReader(localCACertPath, caReloadPeriod, time.Now),
+		// Set default HTTP client
+		httpClient: getDefaultHTTPClient(),
+		// Set the review factory to default to calling into the kubernetes API.
+		reviewFactory: tokenReviewAPIFactory,
 	}
 
 	b.Backend = &framework.Backend{
@@ -111,40 +129,81 @@ func Backend() *kubeAuthBackend {
 		InitializeFunc: b.initialize,
 	}
 
-	// Set default HTTP client
-	b.httpClient = cleanhttp.DefaultPooledClient()
-
-	// Set the review factory to default to calling into the kubernetes API.
-	b.reviewFactory = tokenReviewAPIFactory
-
 	return b
 }
 
 // initialize is used to handle the state of config values just after the K8s plugin has been mounted
 func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
-	// Try to load the config on initialization
-	config, err := b.loadConfig(ctx, req.Storage)
+	config, err := b.config(ctx, req.Storage)
 	if err != nil {
 		return err
 	}
-	if config == nil {
+
+	if config != nil {
+		if err := b.updateTLSConfig(config); err != nil {
+			return err
+		}
+	}
+
+	return b.runTLSConfigUpdater(context.Background(), req.Storage)
+}
+
+// runTLSConfigUpdater sets up a routine that periodically calls b.updateTLSConfig(). This ensures that the
+// httpClient's TLS configuration is consistent with the backend's stored configuration.
+func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Storage) error {
+	updateTLSConfig := func(ctx context.Context, s logical.Storage, force bool) error {
+		config, err := b.config(ctx, s)
+		if err != nil {
+			return fmt.Errorf("failed config read, err=%w", err)
+		}
+
+		if config == nil {
+			b.Logger().Trace("Skipping TLSConfig update, no configuration set")
+			return nil
+		}
+
+		if err := b.updateTLSConfig(config); err != nil {
+			return err
+		}
+
 		return nil
 	}
 
-	b.l.Lock()
-	defer b.l.Unlock()
-	// If we have a CA cert build the TLSConfig
-	if len(config.CACert) > 0 {
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM([]byte(config.CACert))
+	horizon := time.Second * 30
+	ticker := time.NewTicker(horizon)
+	wCtx, cancel := context.WithCancel(ctx)
+	go func(ctx context.Context, cancel context.CancelFunc, s logical.Storage) {
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
+		defer signal.Stop(sigs)
 
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool,
+		b.Logger().Trace("Starting TLS config updater", "horizon", horizon.String())
+		for {
+			select {
+			case <-ctx.Done():
+				b.Logger().Trace("Shutting down TLS config updater")
+				return
+			case <-ticker.C:
+				if err := updateTLSConfig(ctx, s, false); err != nil {
+					b.Logger().Warn("Retrying failed update", "horizon", horizon.String(), "err", err)
+				}
+			case sig := <-sigs:
+				b.Logger().Trace(fmt.Sprintf("Caught signal %v", sig))
+				switch sig {
+				case syscall.SIGHUP:
+					// update the TLS configuration when the plugin process receives a SIGHUP
+					b.Logger().Trace(fmt.Sprintf("Calling updateTLSConfig() on signal %v", sig))
+					if err := updateTLSConfig(ctx, s, true); err != nil {
+						b.Logger().Warn("Retrying failed update", "horizon", horizon.String(), "err", err)
+					}
+				default:
+					// shutdown on all other signals
+					b.Logger().Trace(fmt.Sprintf("Calling cancel() on signal %v", sig))
+					cancel()
+				}
+			}
 		}
-
-		b.httpClient.Transport.(*http.Transport).TLSClientConfig = tlsConfig
-	}
+	}(wCtx, cancel, s)
 
 	return nil
 }
@@ -253,6 +312,81 @@ func (b *kubeAuthBackend) role(ctx context.Context, s logical.Storage, name stri
 	}
 
 	return role, nil
+}
+
+// getHTTPClient return the backend's HTTP client for connecting to the Kubernetes API.
+func (b *kubeAuthBackend) getHTTPClient(config *kubeConfig) (*http.Client, error) {
+	if b.httpClient == nil {
+		return nil, fmt.Errorf("the backend's http.Client has not been initialized")
+	}
+
+	if b.tlsConfig == nil {
+		// ensure that HTTP client's transport TLS configuration is initialized
+		// this adds some belt-and-suspenders,
+		// since in most cases the TLS configuration would have already been initialized.
+		if err := b.updateTLSConfig(config); err != nil {
+			return nil, err
+		}
+	}
+
+	return b.httpClient, nil
+}
+
+// updateTLSConfig ensures that the httpClient's TLS configuration is consistent
+// with backend's stored configuration.
+func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
+	b.l.Lock()
+	defer b.l.Unlock()
+
+	if b.httpClient == nil {
+		return fmt.Errorf("the backend's http.Client has not been initialized")
+	}
+
+	// attempt to read the CA certificates the config directly or from the filesystem.
+	var caCertBytes []byte
+	if config.CACert != "" {
+		caCertBytes = []byte(config.CACert)
+	} else if !config.DisableLocalCAJwt && b.localCACertReader != nil {
+		// TODO: this may block on I/O, investigate a proper mitigation
+		data, err := b.localCACertReader.ReadFile()
+		if err != nil {
+			return err
+		}
+		caCertBytes = []byte(data)
+	}
+
+	transport, ok := b.httpClient.Transport.(*http.Transport)
+	if !ok {
+		// should never happen
+		return fmt.Errorf("type assertion failed for %T", b.httpClient.Transport)
+	}
+
+	if b.tlsConfig == nil {
+		b.tlsConfig = defaultTLSConfig()
+	}
+
+	certPool := x509.NewCertPool()
+	if len(caCertBytes) > 0 {
+		if ok := certPool.AppendCertsFromPEM(caCertBytes); !ok {
+			b.Logger().Warn("Configured CA PEM data contains no valid certificates, TLS verification will fail")
+		}
+	} else {
+		// provide an empty certPool
+		b.Logger().Warn("No CA certificates configured, TLS verification will fail")
+		// TODO: think about supporting host root CA certificates via a configuration toggle,
+		// in which case RootCAs should be set to nil
+	}
+
+	// only refresh the Root CAs if they have changed since the last full update.
+	if b.tlsConfig.RootCAs.Equal(certPool) {
+		b.Logger().Trace("Root CA certificate pool has changed, updating the client's transport")
+		b.tlsConfig.RootCAs = certPool
+		transport.TLSClientConfig = b.tlsConfig
+	} else {
+		b.Logger().Trace("Root CA certificate pool is unchanged, no update required")
+	}
+
+	return nil
 }
 
 func validateAliasNameSource(source string) error {
