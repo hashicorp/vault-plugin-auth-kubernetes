@@ -378,7 +378,7 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	}
 
 	// only refresh the Root CAs if they have changed since the last full update.
-	if b.tlsConfig.RootCAs.Equal(certPool) {
+	if !b.tlsConfig.RootCAs.Equal(certPool) {
 		b.Logger().Trace("Root CA certificate pool has changed, updating the client's transport")
 		b.tlsConfig.RootCAs = certPool
 		transport.TLSClientConfig = b.tlsConfig

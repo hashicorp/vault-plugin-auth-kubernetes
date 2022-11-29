@@ -58,6 +58,7 @@ setup-integration-test: teardown-integration-test vault-image
 		--set server.dev.enabled=true \
 		--set server.image.tag=dev \
 		--set server.image.pullPolicy=Never \
+		--set server.logLevel=trace \
 		--set injector.enabled=false \
 		--set server.extraArgs="-dev-plugin-dir=/vault/plugin_directory"
 	kubectl patch --namespace=test statefulset vault --patch-file integrationtest/vault/hostPortPatch.yaml
