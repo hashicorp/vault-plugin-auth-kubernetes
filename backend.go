@@ -29,6 +29,7 @@ const (
 	aliasNameSourceSAUid   = "serviceaccount_uid"
 	aliasNameSourceSAName  = "serviceaccount_name"
 	aliasNameSourceDefault = aliasNameSourceSAUid
+	minTLSVersion          = tls.VersionTLS12
 )
 
 var (
@@ -47,6 +48,12 @@ var (
 	// caReloadPeriod is the time period how often the in-memory copy of local
 	// CA cert can be used, before reading it again from disk.
 	caReloadPeriod = 1 * time.Hour
+
+	// defaultHorizon for the tlsConfigUpdater.
+	defaultHorizon = time.Second * 30
+
+	// defaultMinHorizon for the tlsConfigUpdater.
+	defaultMinHorizon = time.Second * 5
 )
 
 // kubeAuthBackend implements logical.Backend
@@ -77,6 +84,9 @@ type kubeAuthBackend struct {
 	// - disable_local_ca_jwt is false
 	localCACertReader *cachingFileReader
 
+	// tlsConfigUpdaterRunning is used to signal the current state of the tlsConfig updater routine.
+	tlsConfigUpdaterRunning bool
+
 	l sync.RWMutex
 }
 
@@ -93,7 +103,7 @@ var getDefaultHTTPClient = cleanhttp.DefaultPooledClient
 
 func defaultTLSConfig() *tls.Config {
 	return &tls.Config{
-		MinVersion: tls.VersionTLS12,
+		MinVersion: minTLSVersion,
 	}
 }
 
@@ -145,12 +155,22 @@ func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.Initializ
 		}
 	}
 
-	return b.runTLSConfigUpdater(context.Background(), req.Storage)
+	return b.runTLSConfigUpdater(context.Background(), req.Storage, defaultHorizon)
 }
 
 // runTLSConfigUpdater sets up a routine that periodically calls b.updateTLSConfig(). This ensures that the
 // httpClient's TLS configuration is consistent with the backend's stored configuration.
-func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Storage) error {
+func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Storage, horizon time.Duration) error {
+	b.l.Lock()
+	defer b.l.Unlock()
+	if b.tlsConfigUpdaterRunning {
+		return nil
+	}
+
+	if horizon < defaultMinHorizon {
+		return fmt.Errorf("update horizon must be equal to or greater than %s", defaultMinHorizon)
+	}
+
 	updateTLSConfig := func(ctx context.Context, s logical.Storage, force bool) error {
 		config, err := b.config(ctx, s)
 		if err != nil {
@@ -169,41 +189,46 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 		return nil
 	}
 
-	horizon := time.Second * 30
 	ticker := time.NewTicker(horizon)
 	wCtx, cancel := context.WithCancel(ctx)
 	go func(ctx context.Context, cancel context.CancelFunc, s logical.Storage) {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
 		defer signal.Stop(sigs)
+		defer func() {
+			b.tlsConfigUpdaterRunning = false
+		}()
 
-		b.Logger().Trace("Starting TLS config updater", "horizon", horizon.String())
+		b.Logger().Trace("Starting TLS config updater", "horizon", horizon)
 		for {
+			var err error
 			select {
 			case <-ctx.Done():
 				b.Logger().Trace("Shutting down TLS config updater")
 				return
 			case <-ticker.C:
-				if err := updateTLSConfig(ctx, s, false); err != nil {
-					b.Logger().Warn("Retrying failed update", "horizon", horizon.String(), "err", err)
-				}
+				err = updateTLSConfig(ctx, s, false)
 			case sig := <-sigs:
 				b.Logger().Trace(fmt.Sprintf("Caught signal %v", sig))
 				switch sig {
 				case syscall.SIGHUP:
 					// update the TLS configuration when the plugin process receives a SIGHUP
 					b.Logger().Trace(fmt.Sprintf("Calling updateTLSConfig() on signal %v", sig))
-					if err := updateTLSConfig(ctx, s, true); err != nil {
-						b.Logger().Warn("Retrying failed update", "horizon", horizon.String(), "err", err)
-					}
+					err = updateTLSConfig(ctx, s, true)
 				default:
 					// shutdown on all other signals
 					b.Logger().Trace(fmt.Sprintf("Calling cancel() on signal %v", sig))
 					cancel()
 				}
 			}
+
+			if err != nil {
+				b.Logger().Warn("TLSConfig update failed, retrying", "horizon", defaultHorizon.String(), "err", err)
+			}
 		}
 	}(wCtx, cancel, s)
+
+	b.tlsConfigUpdaterRunning = true
 
 	return nil
 }
@@ -333,7 +358,7 @@ func (b *kubeAuthBackend) getHTTPClient(config *kubeConfig) (*http.Client, error
 }
 
 // updateTLSConfig ensures that the httpClient's TLS configuration is consistent
-// with backend's stored configuration.
+// with the backend's stored configuration.
 func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	b.l.Lock()
 	defer b.l.Unlock()
