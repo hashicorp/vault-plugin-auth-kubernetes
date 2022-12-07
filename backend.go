@@ -144,6 +144,10 @@ func Backend() *kubeAuthBackend {
 
 // initialize is used to handle the state of config values just after the K8s plugin has been mounted
 func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
+	if err := b.runTLSConfigUpdater(context.Background(), req.Storage, defaultHorizon); err != nil {
+		return err
+	}
+
 	config, err := b.config(ctx, req.Storage)
 	if err != nil {
 		return err
@@ -155,7 +159,7 @@ func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.Initializ
 		}
 	}
 
-	return b.runTLSConfigUpdater(context.Background(), req.Storage, defaultHorizon)
+	return nil
 }
 
 // runTLSConfigUpdater sets up a routine that periodically calls b.updateTLSConfig(). This ensures that the
@@ -171,7 +175,7 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 		return fmt.Errorf("update horizon must be equal to or greater than %s", defaultMinHorizon)
 	}
 
-	updateTLSConfig := func(ctx context.Context, s logical.Storage, force bool) error {
+	updateTLSConfig := func(ctx context.Context, s logical.Storage) error {
 		config, err := b.config(ctx, s)
 		if err != nil {
 			return fmt.Errorf("failed config read, err=%w", err)
@@ -207,14 +211,14 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 				b.Logger().Trace("Shutting down TLS config updater")
 				return
 			case <-ticker.C:
-				err = updateTLSConfig(ctx, s, false)
+				err = updateTLSConfig(ctx, s)
 			case sig := <-sigs:
 				b.Logger().Trace(fmt.Sprintf("Caught signal %v", sig))
 				switch sig {
 				case syscall.SIGHUP:
 					// update the TLS configuration when the plugin process receives a SIGHUP
 					b.Logger().Trace(fmt.Sprintf("Calling updateTLSConfig() on signal %v", sig))
-					err = updateTLSConfig(ctx, s, true)
+					err = updateTLSConfig(ctx, s)
 				default:
 					// shutdown on all other signals
 					b.Logger().Trace(fmt.Sprintf("Calling cancel() on signal %v", sig))
@@ -223,7 +227,8 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 			}
 
 			if err != nil {
-				b.Logger().Warn("TLSConfig update failed, retrying", "horizon", defaultHorizon.String(), "err", err)
+				b.Logger().Warn("TLSConfig update failed, retrying",
+					"horizon", defaultHorizon.String(), "err", err)
 			}
 		}
 	}(wCtx, cancel, s)
