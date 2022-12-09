@@ -8,11 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
@@ -49,10 +46,12 @@ var (
 	// CA cert can be used, before reading it again from disk.
 	caReloadPeriod = 1 * time.Hour
 
-	// defaultHorizon for the tlsConfigUpdater.
+	// defaultHorizon provides the default duration to be used
+	// in the tlsConfigUpdater's time.Ticker, setup in runTLSConfigUpdater()
 	defaultHorizon = time.Second * 30
 
-	// defaultMinHorizon for the tlsConfigUpdater.
+	// defaultMinHorizon provides the minimum duration that can be specified
+	// in the tlsConfigUpdater's time.Ticker, setup in runTLSConfigUpdater()
 	defaultMinHorizon = time.Second * 5
 )
 
@@ -196,9 +195,6 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 	ticker := time.NewTicker(horizon)
 	wCtx, cancel := context.WithCancel(ctx)
 	go func(ctx context.Context, cancel context.CancelFunc, s logical.Storage) {
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
-		defer signal.Stop(sigs)
 		defer func() {
 			b.tlsConfigUpdaterRunning = false
 		}()
@@ -212,18 +208,6 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 				return
 			case <-ticker.C:
 				err = updateTLSConfig(ctx, s)
-			case sig := <-sigs:
-				b.Logger().Trace(fmt.Sprintf("Caught signal %v", sig))
-				switch sig {
-				case syscall.SIGHUP:
-					// update the TLS configuration when the plugin process receives a SIGHUP
-					b.Logger().Trace(fmt.Sprintf("Calling updateTLSConfig() on signal %v", sig))
-					err = updateTLSConfig(ctx, s)
-				default:
-					// shutdown on all other signals
-					b.Logger().Trace(fmt.Sprintf("Calling cancel() on signal %v", sig))
-					cancel()
-				}
 			}
 
 			if err != nil {
