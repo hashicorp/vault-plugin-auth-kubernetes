@@ -356,7 +356,7 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 		return fmt.Errorf("the backend's http.Client has not been initialized")
 	}
 
-	// attempt to read the CA certificates the config directly or from the filesystem.
+	// attempt to read the CA certificates from the config directly or from the filesystem.
 	var caCertBytes []byte
 	if config.CACert != "" {
 		caCertBytes = []byte(config.CACert)
