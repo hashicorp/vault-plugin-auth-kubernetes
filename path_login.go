@@ -131,6 +131,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 
 	client, err := b.getHTTPClient(config)
 	if err != nil {
+		b.Logger().Error(`Failed to get the HTTP client`, "err", err)
 		return nil, logical.ErrUnrecoverable
 	}
 

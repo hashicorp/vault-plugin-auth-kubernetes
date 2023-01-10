@@ -66,7 +66,7 @@ type kubeAuthBackend struct {
 	tlsConfig *tls.Config
 
 	// reviewFactory is used to configure the strategy for doing a token review.
-	// Currently the only options are using the kubernetes API or mocking the
+	// Currently, the only options are using the kubernetes API or mocking the
 	// review. Mocks should only be used in tests.
 	reviewFactory tokenReviewFactory
 
@@ -85,6 +85,9 @@ type kubeAuthBackend struct {
 
 	// tlsConfigUpdaterRunning is used to signal the current state of the tlsConfig updater routine.
 	tlsConfigUpdaterRunning bool
+
+	// tlsConfigUpdateCancelFunc should be called in the backend's Clean(), set in initialize().
+	tlsConfigUpdateCancelFunc context.CancelFunc
 
 	l sync.RWMutex
 }
@@ -136,6 +139,7 @@ func Backend() *kubeAuthBackend {
 			pathsRole(b),
 		),
 		InitializeFunc: b.initialize,
+		Clean:          b.cleanup,
 	}
 
 	return b
@@ -143,9 +147,13 @@ func Backend() *kubeAuthBackend {
 
 // initialize is used to handle the state of config values just after the K8s plugin has been mounted
 func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
-	if err := b.runTLSConfigUpdater(context.Background(), req.Storage, defaultHorizon); err != nil {
+	updaterCtx, cancel := context.WithCancel(context.Background())
+	if err := b.runTLSConfigUpdater(updaterCtx, req.Storage, defaultHorizon); err != nil {
+		cancel()
 		return err
 	}
+
+	b.tlsConfigUpdateCancelFunc = cancel
 
 	config, err := b.config(ctx, req.Storage)
 	if err != nil {
@@ -161,11 +169,16 @@ func (b *kubeAuthBackend) initialize(ctx context.Context, req *logical.Initializ
 	return nil
 }
 
+func (b *kubeAuthBackend) cleanup(_ context.Context) {
+	b.shutdownTLSConfigUpdater()
+}
+
 // runTLSConfigUpdater sets up a routine that periodically calls b.updateTLSConfig(). This ensures that the
 // httpClient's TLS configuration is consistent with the backend's stored configuration.
 func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Storage, horizon time.Duration) error {
 	b.l.Lock()
 	defer b.l.Unlock()
+
 	if b.tlsConfigUpdaterRunning {
 		return nil
 	}
@@ -193,18 +206,23 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 	}
 
 	ticker := time.NewTicker(horizon)
-	wCtx, cancel := context.WithCancel(ctx)
-	go func(ctx context.Context, cancel context.CancelFunc, s logical.Storage) {
+	go func(ctx context.Context, s logical.Storage) {
 		defer func() {
+			b.l.Lock()
+			defer b.l.Unlock()
+			ticker.Stop()
 			b.tlsConfigUpdaterRunning = false
+			b.tlsConfigUpdateCancelFunc = nil
+			b.Logger().Trace("TLSConfig updater shutdown completed")
 		}()
 
-		b.Logger().Trace("Starting TLS config updater", "horizon", horizon)
+		b.Logger().Trace("TLSConfig updater starting", "horizon", horizon)
+		b.tlsConfigUpdaterRunning = true
+		var err error
 		for {
-			var err error
 			select {
 			case <-ctx.Done():
-				b.Logger().Trace("Shutting down TLS config updater")
+				b.Logger().Trace("TLSConfig updater shutting down")
 				return
 			case <-ticker.C:
 				err = updateTLSConfig(ctx, s)
@@ -215,11 +233,27 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 					"horizon", defaultHorizon.String(), "err", err)
 			}
 		}
-	}(wCtx, cancel, s)
+	}(ctx, s)
 
-	b.tlsConfigUpdaterRunning = true
+	// wait for the updater to start since we hold the "start" lock
+	delay := time.Millisecond * 50
+	var elapsed time.Duration
+	for elapsed < delay*10 {
+		if b.tlsConfigUpdaterRunning {
+			return nil
+		}
 
-	return nil
+		time.Sleep(delay)
+		elapsed += delay
+	}
+	return fmt.Errorf("TLSConfig updater failed to start after %s", elapsed)
+}
+
+func (b *kubeAuthBackend) shutdownTLSConfigUpdater() {
+	if b.tlsConfigUpdateCancelFunc != nil {
+		b.Logger().Debug("TLSConfig updater shutdown requested")
+		b.tlsConfigUpdateCancelFunc()
+	}
 }
 
 // config takes a storage object and returns a kubeConfig object.
@@ -335,12 +369,7 @@ func (b *kubeAuthBackend) getHTTPClient(config *kubeConfig) (*http.Client, error
 	}
 
 	if b.tlsConfig == nil {
-		// ensure that HTTP client's transport TLS configuration is initialized
-		// this adds some belt-and-suspenders,
-		// since in most cases the TLS configuration would have already been initialized.
-		if err := b.updateTLSConfig(config); err != nil {
-			return nil, err
-		}
+		return nil, fmt.Errorf("the backend's TLSConfig has not been initialized")
 	}
 
 	return b.httpClient, nil
