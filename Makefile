@@ -1,8 +1,9 @@
+TESTARGS  ?= '-test.v'
 # kind cluster name
-KIND_CLUSTER_NAME?=vault-plugin-auth-kubernetes
+KIND_CLUSTER_NAME ?= vault-plugin-auth-kubernetes
 
 # kind k8s version
-KIND_K8S_VERSION?=v1.25.0
+KIND_K8S_VERSION ?= v1.25.0
 
 .PHONY: default
 default: dev
@@ -13,11 +14,11 @@ dev:
 
 .PHONY: test
 test: fmtcheck
-	CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
+	CGO_ENABLED=1 go test -race $(TESTARGS) -timeout=20m ./...
 
 .PHONY: integration-test
 integration-test:
-	INTEGRATION_TESTS=true CGO_ENABLED=0 go test github.com/hashicorp/vault-plugin-auth-kubernetes/integrationtest/... $(TESTARGS) -count=1 -timeout=20m
+	INTEGRATION_TESTS=true CGO_ENABLED=0 go test $(TESTARGS) -count=1 -timeout=20m github.com/hashicorp/vault-plugin-auth-kubernetes/integrationtest/...
 
 .PHONY: fmtcheck
 fmtcheck:

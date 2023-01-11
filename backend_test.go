@@ -420,7 +420,7 @@ func Test_kubeAuthBackend_runTLSConfigUpdater(t *testing.T) {
 			}
 
 			configCount := len(tt.configs)
-			ctx, cancel := context.WithTimeout(tt.ctx, tt.horizon*time.Duration(configCount+1))
+			ctx, cancel := context.WithTimeout(tt.ctx, tt.horizon*time.Duration(configCount*2))
 			defer cancel()
 			err := b.runTLSConfigUpdater(ctx, tt.storage, tt.horizon)
 			if tt.wantErr && err == nil {
@@ -455,9 +455,9 @@ func Test_kubeAuthBackend_runTLSConfigUpdater(t *testing.T) {
 							}
 						}
 
-						time.Sleep(tt.horizon * 2)
+						time.Sleep(tt.horizon * 3)
 						if b.tlsConfig == nil {
-							t.Fatalf("runTLSConfigUpdater(), ")
+							t.Fatalf("runTLSConfigUpdater(), expected tlsConfig initialization")
 						}
 						assertTLSConfigEquals(t, b.tlsConfig, config.expectTLSConfig)
 						assertValidTransport(t, b, config.expectTLSConfig)
