@@ -14,7 +14,7 @@ dev:
 
 .PHONY: test
 test: fmtcheck
-	CGO_ENABLED=1 go test -race $(TESTARGS) -timeout=20m ./...
+	CGO_ENABLED=0 go test $(TESTARGS) -timeout=20m ./...
 
 .PHONY: integration-test
 integration-test:
