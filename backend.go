@@ -90,6 +90,9 @@ type kubeAuthBackend struct {
 	tlsConfigUpdateCancelFunc context.CancelFunc
 
 	l sync.RWMutex
+
+	// tlsMu provides the lock for synchronizing updates to the tlsConfig.
+	tlsMu sync.RWMutex
 }
 
 // Factory returns a new backend as logical.Backend.
@@ -176,8 +179,8 @@ func (b *kubeAuthBackend) cleanup(_ context.Context) {
 // runTLSConfigUpdater sets up a routine that periodically calls b.updateTLSConfig(). This ensures that the
 // httpClient's TLS configuration is consistent with the backend's stored configuration.
 func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Storage, horizon time.Duration) error {
-	b.l.Lock()
-	defer b.l.Unlock()
+	b.tlsMu.Lock()
+	defer b.tlsMu.Unlock()
 
 	if b.tlsConfigUpdaterRunning {
 		return nil
@@ -208,11 +211,10 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 	ticker := time.NewTicker(horizon)
 	go func(ctx context.Context, s logical.Storage) {
 		defer func() {
-			b.l.Lock()
-			defer b.l.Unlock()
+			b.tlsMu.Lock()
+			defer b.tlsMu.Unlock()
 			ticker.Stop()
 			b.tlsConfigUpdaterRunning = false
-			b.tlsConfigUpdateCancelFunc = nil
 			b.Logger().Trace("TLSConfig updater shutdown completed")
 		}()
 
@@ -253,6 +255,7 @@ func (b *kubeAuthBackend) shutdownTLSConfigUpdater() {
 	if b.tlsConfigUpdateCancelFunc != nil {
 		b.Logger().Debug("TLSConfig updater shutdown requested")
 		b.tlsConfigUpdateCancelFunc()
+		b.tlsConfigUpdateCancelFunc = nil
 	}
 }
 
@@ -363,7 +366,7 @@ func (b *kubeAuthBackend) role(ctx context.Context, s logical.Storage, name stri
 }
 
 // getHTTPClient return the backend's HTTP client for connecting to the Kubernetes API.
-func (b *kubeAuthBackend) getHTTPClient(config *kubeConfig) (*http.Client, error) {
+func (b *kubeAuthBackend) getHTTPClient() (*http.Client, error) {
 	if b.httpClient == nil {
 		return nil, fmt.Errorf("the backend's http.Client has not been initialized")
 	}
@@ -378,8 +381,8 @@ func (b *kubeAuthBackend) getHTTPClient(config *kubeConfig) (*http.Client, error
 // updateTLSConfig ensures that the httpClient's TLS configuration is consistent
 // with the backend's stored configuration.
 func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
-	b.l.Lock()
-	defer b.l.Unlock()
+	b.tlsMu.Lock()
+	defer b.tlsMu.Unlock()
 
 	if b.httpClient == nil {
 		return fmt.Errorf("the backend's http.Client has not been initialized")

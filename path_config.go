@@ -120,6 +120,9 @@ func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Reque
 
 // pathConfigWrite handles create and update commands to the config
 func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	b.l.Lock()
+	defer b.l.Unlock()
+
 	host := data.Get("kubernetes_host").(string)
 	if host == "" {
 		return logical.ErrorResponse("no host provided"), nil
