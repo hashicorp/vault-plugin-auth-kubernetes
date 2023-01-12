@@ -397,7 +397,6 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	b.tlsMu.Lock()
 	defer b.tlsMu.Unlock()
 
-	// ensure that the
 	if err := b.validateHTTPClientInit(); err != nil {
 		return err
 	}
