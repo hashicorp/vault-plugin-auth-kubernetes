@@ -1,14 +1,12 @@
 ---
-  name: Backport Assistant Runner for Vault Plugin Eco Projects
-
-  on:
-    pull_request_target:
-      types:
-        - closed
-        - labeled
-
-  jobs:
-    backport-targeted-release-branch:
+name: Backport Assistant Runner for Vault Plugin Eco Projects
+on:
+  pull_request_target:
+    types:
+      - closed
+      - labeled
+jobs:
+  backport-targeted-release-branch:
     if: github.event.pull_request.merged
     runs-on: ubuntu-latest
     container: hashicorpdev/backport-assistant:0.3.1
