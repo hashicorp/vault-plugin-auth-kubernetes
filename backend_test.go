@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -33,22 +32,34 @@ func Test_kubeAuthBackend_updateTLSConfig(t *testing.T) {
 	tests := []struct {
 		name       string
 		httpClient *http.Client
+		tlsConfig  *tls.Config
 		wantErr    bool
 		configs    []testConfig
 	}{
 		{
-			name:       "fail-client-not-initialized",
+			name:       "fail-client-not-set",
 			httpClient: nil,
 			configs: []testConfig{
 				{
 					wantErr:     true,
-					expectError: errors.New("the backend's http.Client has not been initialized"),
+					expectError: errHTTPClientNotSet,
+				},
+			},
+		},
+		{
+			name:       "fail-tlsConfig-not-set",
+			httpClient: getDefaultHTTPClient(),
+			configs: []testConfig{
+				{
+					wantErr:     true,
+					expectError: errTLSConfigNotSet,
 				},
 			},
 		},
 		{
 			name:       "ca-certs-from-config-source",
 			httpClient: getDefaultHTTPClient(),
+			tlsConfig:  getDefaultTLSConfig(),
 			wantErr:    false,
 			configs: []testConfig{
 				{
@@ -86,6 +97,7 @@ func Test_kubeAuthBackend_updateTLSConfig(t *testing.T) {
 		{
 			name:       "ca-certs-from-file-source",
 			httpClient: getDefaultHTTPClient(),
+			tlsConfig:  getDefaultTLSConfig(),
 			configs: []testConfig{
 				{
 					config: &kubeConfig{
@@ -113,6 +125,7 @@ func Test_kubeAuthBackend_updateTLSConfig(t *testing.T) {
 		{
 			name:       "ca-certs-mixed-source",
 			httpClient: getDefaultHTTPClient(),
+			tlsConfig:  getDefaultTLSConfig(),
 			configs: []testConfig{
 				{
 					config: &kubeConfig{
@@ -163,6 +176,7 @@ func Test_kubeAuthBackend_updateTLSConfig(t *testing.T) {
 			b := &kubeAuthBackend{
 				Backend:    &framework.Backend{},
 				httpClient: tt.httpClient,
+				tlsConfig:  tt.tlsConfig,
 			}
 
 			if err := b.Setup(context.Background(),
@@ -227,9 +241,10 @@ func Test_kubeAuthBackend_initialize(t *testing.T) {
 		expectErr       error
 	}{
 		{
-			name:       "fail-client-not-initialized",
+			name:       "fail-client-not-set",
 			ctx:        context.Background(),
 			httpClient: nil,
+			tlsConfig:  getDefaultTLSConfig(),
 			req: &logical.InitializationRequest{
 				Storage: &logical.InmemStorage{},
 			},
@@ -238,12 +253,13 @@ func Test_kubeAuthBackend_initialize(t *testing.T) {
 				DisableLocalCAJwt: false,
 			},
 			wantErr:   true,
-			expectErr: errors.New("the backend's http.Client has not been initialized"),
+			expectErr: errHTTPClientNotSet,
 		},
 		{
 			name:       "no-config",
 			ctx:        context.Background(),
 			httpClient: getDefaultHTTPClient(),
+			tlsConfig:  getDefaultTLSConfig(),
 			req: &logical.InitializationRequest{
 				Storage: &logical.InmemStorage{},
 			},
@@ -254,6 +270,7 @@ func Test_kubeAuthBackend_initialize(t *testing.T) {
 			name:       "initialized-from-config",
 			ctx:        context.Background(),
 			httpClient: getDefaultHTTPClient(),
+			tlsConfig:  getDefaultTLSConfig(),
 			req: &logical.InitializationRequest{
 				Storage: &logical.InmemStorage{},
 			},
@@ -318,10 +335,6 @@ func Test_kubeAuthBackend_initialize(t *testing.T) {
 			if tt.config != nil {
 				assertTLSConfigEquals(t, b.tlsConfig, tt.expectTLSConfig)
 				assertValidTransport(t, b, tt.expectTLSConfig)
-			} else {
-				if b.tlsConfig != nil {
-					t.Errorf("initialize(), unexpected tlsConfig initialization")
-				}
 			}
 
 			if !b.tlsConfigUpdaterRunning {
@@ -353,6 +366,7 @@ func Test_kubeAuthBackend_runTLSConfigUpdater(t *testing.T) {
 	}{
 		{
 			name:       "initialized-from-config",
+			tlsConfig:  getDefaultTLSConfig(),
 			ctx:        context.Background(),
 			storage:    &logical.InmemStorage{},
 			horizon:    time.Millisecond * 500,

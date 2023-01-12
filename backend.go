@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -53,6 +54,9 @@ var (
 	// defaultMinHorizon provides the minimum duration that can be specified
 	// in the tlsConfigUpdater's time.Ticker, setup in runTLSConfigUpdater()
 	defaultMinHorizon = time.Second * 5
+
+	errTLSConfigNotSet  = errors.New("TLSConfig not set")
+	errHTTPClientNotSet = errors.New("http.Client not set")
 )
 
 // kubeAuthBackend implements logical.Backend
@@ -98,15 +102,17 @@ type kubeAuthBackend struct {
 // Factory returns a new backend as logical.Backend.
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
 	b := Backend()
+
 	if err := b.Setup(ctx, conf); err != nil {
 		return nil, err
 	}
+
 	return b, nil
 }
 
 var getDefaultHTTPClient = cleanhttp.DefaultPooledClient
 
-func defaultTLSConfig() *tls.Config {
+func getDefaultTLSConfig() *tls.Config {
 	return &tls.Config{
 		MinVersion: minTLSVersion,
 	}
@@ -118,6 +124,8 @@ func Backend() *kubeAuthBackend {
 		localCACertReader:  newCachingFileReader(localCACertPath, caReloadPeriod, time.Now),
 		// Set default HTTP client
 		httpClient: getDefaultHTTPClient(),
+		// Set the default TLSConfig
+		tlsConfig: getDefaultTLSConfig(),
 		// Set the review factory to default to calling into the kubernetes API.
 		reviewFactory: tokenReviewAPIFactory,
 	}
@@ -176,6 +184,18 @@ func (b *kubeAuthBackend) cleanup(_ context.Context) {
 	b.shutdownTLSConfigUpdater()
 }
 
+// validateHTTPClientInit that the Backend's HTTPClient and TLSConfig has been properly instantiated.
+func (b *kubeAuthBackend) validateHTTPClientInit() error {
+	if b.httpClient == nil {
+		return errHTTPClientNotSet
+	}
+	if b.tlsConfig == nil {
+		return errTLSConfigNotSet
+	}
+
+	return nil
+}
+
 // runTLSConfigUpdater sets up a routine that periodically calls b.updateTLSConfig(). This ensures that the
 // httpClient's TLS configuration is consistent with the backend's stored configuration.
 func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Storage, horizon time.Duration) error {
@@ -188,6 +208,10 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 
 	if horizon < defaultMinHorizon {
 		return fmt.Errorf("update horizon must be equal to or greater than %s", defaultMinHorizon)
+	}
+
+	if err := b.validateHTTPClientInit(); err != nil {
+		return err
 	}
 
 	updateTLSConfig := func(ctx context.Context, s logical.Storage) error {
@@ -208,6 +232,8 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 		return nil
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	ticker := time.NewTicker(horizon)
 	go func(ctx context.Context, s logical.Storage) {
 		defer func() {
@@ -220,35 +246,23 @@ func (b *kubeAuthBackend) runTLSConfigUpdater(ctx context.Context, s logical.Sto
 
 		b.Logger().Trace("TLSConfig updater starting", "horizon", horizon)
 		b.tlsConfigUpdaterRunning = true
-		var err error
+		wg.Done()
 		for {
 			select {
 			case <-ctx.Done():
 				b.Logger().Trace("TLSConfig updater shutting down")
 				return
 			case <-ticker.C:
-				err = updateTLSConfig(ctx, s)
-			}
-
-			if err != nil {
-				b.Logger().Warn("TLSConfig update failed, retrying",
-					"horizon", defaultHorizon.String(), "err", err)
+				if err := updateTLSConfig(ctx, s); err != nil {
+					b.Logger().Warn("TLSConfig update failed, retrying",
+						"horizon", defaultHorizon.String(), "err", err)
+				}
 			}
 		}
 	}(ctx, s)
+	wg.Wait()
 
-	// wait for the updater to start since we hold the "start" lock
-	delay := time.Millisecond * 50
-	var elapsed time.Duration
-	for elapsed < delay*10 {
-		if b.tlsConfigUpdaterRunning {
-			return nil
-		}
-
-		time.Sleep(delay)
-		elapsed += delay
-	}
-	return fmt.Errorf("TLSConfig updater failed to start after %s", elapsed)
+	return nil
 }
 
 func (b *kubeAuthBackend) shutdownTLSConfigUpdater() {
@@ -367,12 +381,11 @@ func (b *kubeAuthBackend) role(ctx context.Context, s logical.Storage, name stri
 
 // getHTTPClient return the backend's HTTP client for connecting to the Kubernetes API.
 func (b *kubeAuthBackend) getHTTPClient() (*http.Client, error) {
-	if b.httpClient == nil {
-		return nil, fmt.Errorf("the backend's http.Client has not been initialized")
-	}
+	b.tlsMu.RLock()
+	defer b.tlsMu.RUnlock()
 
-	if b.tlsConfig == nil {
-		return nil, fmt.Errorf("the backend's TLSConfig has not been initialized")
+	if err := b.validateHTTPClientInit(); err != nil {
+		return nil, err
 	}
 
 	return b.httpClient, nil
@@ -384,8 +397,9 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	b.tlsMu.Lock()
 	defer b.tlsMu.Unlock()
 
-	if b.httpClient == nil {
-		return fmt.Errorf("the backend's http.Client has not been initialized")
+	// ensure that the
+	if err := b.validateHTTPClientInit(); err != nil {
+		return err
 	}
 
 	// attempt to read the CA certificates from the config directly or from the filesystem.
@@ -393,22 +407,11 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	if config.CACert != "" {
 		caCertBytes = []byte(config.CACert)
 	} else if !config.DisableLocalCAJwt && b.localCACertReader != nil {
-		// TODO: this may block on I/O, investigate a proper mitigation
 		data, err := b.localCACertReader.ReadFile()
 		if err != nil {
 			return err
 		}
 		caCertBytes = []byte(data)
-	}
-
-	transport, ok := b.httpClient.Transport.(*http.Transport)
-	if !ok {
-		// should never happen
-		return fmt.Errorf("type assertion failed for %T", b.httpClient.Transport)
-	}
-
-	if b.tlsConfig == nil {
-		b.tlsConfig = defaultTLSConfig()
 	}
 
 	certPool := x509.NewCertPool()
@@ -426,6 +429,12 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	// only refresh the Root CAs if they have changed since the last full update.
 	if !b.tlsConfig.RootCAs.Equal(certPool) {
 		b.Logger().Trace("Root CA certificate pool has changed, updating the client's transport")
+		transport, ok := b.httpClient.Transport.(*http.Transport)
+		if !ok {
+			// should never happen
+			return fmt.Errorf("type assertion failed for %T", b.httpClient.Transport)
+		}
+
 		b.tlsConfig.RootCAs = certPool
 		transport.TLSClientConfig = b.tlsConfig
 	} else {
