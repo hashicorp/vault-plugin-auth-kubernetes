@@ -52,7 +52,7 @@ are allowed.`,
 				},
 				"bound_service_account_namespace_selector": {
 					Type: framework.TypeString,
-					Description: `A label selector for Kubernetes namspaces which are allowed to access this role.
+					Description: `A label selector for Kubernetes namespaces which are allowed to access this role.
 Accepts either a JSON or YAML object. If set with bound_service_account_namespaces,
 the conditions are disjuncted.`,
 				},
