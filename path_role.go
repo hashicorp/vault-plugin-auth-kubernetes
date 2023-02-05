@@ -50,6 +50,12 @@ are allowed.`,
 					Description: `List of namespaces allowed to access this role. If set to "*" all namespaces
 are allowed.`,
 				},
+				"bound_service_account_namespace_selector": {
+					Type: framework.TypeString,
+					Description: `A label selector for Kubernetes namspaces which are allowed to access this role.
+Accepts either a JSON or YAML object. If set with bound_service_account_namespaces,
+the conditions are conjuncted.`,
+				},
 				"audience": {
 					Type:        framework.TypeString,
 					Description: "Optional Audience claim to verify in the jwt.",
@@ -161,8 +167,15 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 
 	// Create a map of data to be returned
 	d := map[string]interface{}{
-		"bound_service_account_names":      role.ServiceAccountNames,
-		"bound_service_account_namespaces": role.ServiceAccountNamespaces,
+		"bound_service_account_names": role.ServiceAccountNames,
+	}
+
+	if len(role.ServiceAccountNamespaces) > 0 {
+		d["bound_service_account_namespaces"] = role.ServiceAccountNamespaces
+	}
+
+	if role.ServiceAccountNamespaceSelector != "" {
+		d["bound_service_account_namespace_selector"] = role.ServiceAccountNamespaceSelector
 	}
 
 	if role.Audience != "" {
@@ -304,12 +317,15 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 
 	if namespaces, ok := data.GetOk("bound_service_account_namespaces"); ok {
 		role.ServiceAccountNamespaces = namespaces.([]string)
-	} else if req.Operation == logical.CreateOperation {
-		role.ServiceAccountNamespaces = data.Get("bound_service_account_namespaces").([]string)
 	}
-	// Verify namespaces is not empty
-	if len(role.ServiceAccountNamespaces) == 0 {
-		return logical.ErrorResponse("%q can not be empty", "bound_service_account_namespaces"), nil
+
+	if namespaceSelector, ok := data.GetOk("bound_service_account_namespace_selector"); ok {
+		role.ServiceAccountNamespaceSelector = namespaceSelector.(string)
+	}
+
+	// Verify namespaces is not empty unless selector is set
+	if len(role.ServiceAccountNamespaces) == 0 && role.ServiceAccountNamespaceSelector == "" {
+		return logical.ErrorResponse("%q can not be empty if %q is not set", "bound_service_account_namespaces", "bound_service_account_namespace_selector"), nil
 	}
 	// Verify * was not set with other data
 	if len(role.ServiceAccountNamespaces) > 1 && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
@@ -363,6 +379,10 @@ type roleStorageEntry struct {
 	// ServiceAccountNamespaces is the array of namespaces able to access this
 	// role.
 	ServiceAccountNamespaces []string `json:"bound_service_account_namespaces" mapstructure:"bound_service_account_namespaces" structs:"bound_service_account_namespaces"`
+
+	// ServiceAccountNamespaceSelector is the label selector string of the
+	// namespaces able to access this role.
+	ServiceAccountNamespaceSelector string `json:"bound_service_account_namespace_selector" mapstructure:"bound_service_account_namespace_selector" structs:"bound_service_account_namespace_selector"`
 
 	// Audience is an optional jwt claim to verify
 	Audience string `json:"audience" mapstructure:"audience" structs:"audience"`
