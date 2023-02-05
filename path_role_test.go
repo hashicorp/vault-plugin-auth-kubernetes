@@ -214,6 +214,18 @@ func TestPath_Create(t *testing.T) {
 			},
 			wantErr: errInvalidAliasNameSource,
 		},
+		"invalid_namespace_label_selector": {
+			data: map[string]interface{}{
+				"bound_service_account_names":              "name",
+				"bound_service_account_namespace_selector": badYAMLSelector,
+				"policies":                                 "test",
+				"period":                                   "3s",
+				"ttl":                                      "1s",
+				"num_uses":                                 12,
+				"max_ttl":                                  "5s",
+			},
+			wantErr: errors.New(`failed to parse "bound_service_account_namespace_selector" as k8s.io/api/meta/v1/LabelSelector object`),
+		},
 		"no_service_account_names": {
 			data: map[string]interface{}{
 				"policies": "test",

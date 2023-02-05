@@ -54,7 +54,7 @@ are allowed.`,
 					Type: framework.TypeString,
 					Description: `A label selector for Kubernetes namspaces which are allowed to access this role.
 Accepts either a JSON or YAML object. If set with bound_service_account_namespaces,
-the conditions are conjuncted.`,
+the conditions are disjuncted.`,
 				},
 				"audience": {
 					Type:        framework.TypeString,
@@ -327,6 +327,13 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	if len(role.ServiceAccountNamespaces) == 0 && role.ServiceAccountNamespaceSelector == "" {
 		return logical.ErrorResponse("%q can not be empty if %q is not set", "bound_service_account_namespaces", "bound_service_account_namespace_selector"), nil
 	}
+	// Verify namespace selector is correct
+	if role.ServiceAccountNamespaceSelector != "" {
+		if _, err := makeLabelSelector(role.ServiceAccountNamespaceSelector); err != nil {
+			return logical.ErrorResponse("failed to parse %q as k8s.io/api/meta/v1/LabelSelector object", "bound_service_account_namespace_selector"), nil
+		}
+	}
+
 	// Verify * was not set with other data
 	if len(role.ServiceAccountNamespaces) > 1 && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
 		return logical.ErrorResponse("can not mix %q with values", "*"), nil
