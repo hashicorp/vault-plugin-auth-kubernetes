@@ -43,7 +43,7 @@ jobs:
           config: integrationtest/kind/config.yaml
           node_image: kindest/node:v${{ matrix.kind-k8s-version }}
       # Must come _after_ kind-action, because the kind step also sets up a kubectl binary.
-      - uses: azure/setup-kubectl@v2.0
+      - uses: azure/setup-kubectl@v3.0
         with:
           version: 'v1.25.0'
       - uses: actions/setup-go@v2
