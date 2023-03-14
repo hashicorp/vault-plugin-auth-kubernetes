@@ -14,7 +14,6 @@ import (
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
-	josejwt "gopkg.in/square/go-jose.v2/jwt"
 )
 
 const (
@@ -136,14 +135,6 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	issuer := data.Get("issuer").(string)
 	disableIssValidation := data.Get("disable_iss_validation").(bool)
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
-
-	if tokenReviewer != "" {
-		// Validate it's a JWT, but don't verify the signature, since we may not have the right cert.
-		_, err := josejwt.ParseSigned(tokenReviewer)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	if disableLocalJWT && caCert == "" {
 		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
