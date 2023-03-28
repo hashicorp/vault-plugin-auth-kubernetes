@@ -27,7 +27,7 @@ func pathsRole(b *kubeAuthBackend) []*framework.Path {
 			HelpSynopsis:    strings.TrimSpace(roleHelp["role-list"][0]),
 			HelpDescription: strings.TrimSpace(roleHelp["role-list"][1]),
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "kubernetes-auth",
+				OperationPrefix: operationPrefixKubernetesAuth,
 				OperationSuffix: "roles",
 				Navigation:      true,
 				ItemType:        "Role",
@@ -105,7 +105,7 @@ default: %q
 			HelpSynopsis:    strings.TrimSpace(roleHelp["role"][0]),
 			HelpDescription: strings.TrimSpace(roleHelp["role"][1]),
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "kubernetes-auth",
+				OperationPrefix: operationPrefixKubernetesAuth,
 				OperationSuffix: "role",
 				ItemType:        "Role",
 				Action:          "Create",

@@ -28,7 +28,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 	return &framework.Path{
 		Pattern: "config$",
 		DisplayAttrs: &framework.DisplayAttributes{
-			OperationPrefix: "kubernetes-auth",
+			OperationPrefix: operationPrefixKubernetesAuth,
 		},
 		Fields: map[string]*framework.FieldSchema{
 			"kubernetes_host": {
