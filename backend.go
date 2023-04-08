@@ -32,8 +32,8 @@ const (
 	aliasNameSourceDefault = aliasNameSourceSAUid
 	minTLSVersion          = tls.VersionTLS12
 
-	// operationPrefixKubernetesAuth is used as a prefix for OpenAPI operation id's.
-	operationPrefixKubernetesAuth = "kubernetes-auth"
+	// operationPrefixKubernetes is used as a prefix for OpenAPI operation id's.
+	operationPrefixKubernetes = "kubernetes"
 )
 
 var (

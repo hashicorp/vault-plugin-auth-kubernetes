@@ -28,7 +28,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 	return &framework.Path{
 		Pattern: "config$",
 		DisplayAttrs: &framework.DisplayAttributes{
-			OperationPrefix: operationPrefixKubernetesAuth,
+			OperationPrefix: operationPrefixKubernetes,
 		},
 		Fields: map[string]*framework.FieldSchema{
 			"kubernetes_host": {
@@ -95,13 +95,15 @@ then this plugin will use kubernetes.io/serviceaccount as the default issuer.
 			logical.UpdateOperation: &framework.PathOperation{
 				Callback: b.pathConfigWrite,
 				DisplayAttrs: &framework.DisplayAttributes{
-					OperationVerb: "configure",
+					OperationVerb:   "configure",
+					OperationSuffix: "auth",
 				},
 			},
 			logical.ReadOperation: &framework.PathOperation{
 				Callback: b.pathConfigRead,
 				DisplayAttrs: &framework.DisplayAttributes{
-					OperationSuffix: "configuration",
+					OperationVerb:   "read",
+					OperationSuffix: "auth-configuration",
 				},
 			},
 		},
