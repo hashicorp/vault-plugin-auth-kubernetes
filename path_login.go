@@ -36,7 +36,7 @@ func pathLogin(b *kubeAuthBackend) *framework.Path {
 
 		DisplayAttrs: &framework.DisplayAttributes{
 			OperationPrefix: operationPrefixKubernetes,
-			OperationVerb:   "log-in",
+			OperationVerb:   "login",
 		},
 
 		Fields: map[string]*framework.FieldSchema{
