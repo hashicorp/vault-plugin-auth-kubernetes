@@ -1,11 +1,25 @@
 ## Unreleased
 
+## 0.16.0 (May 25, 2023)
+* Add display attributes for OpenAPI OperationID's [GH-192](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/192)
+* update dependencies [GH-196](https://github.com/hashicorp/vault-plugin-secrets-kubernetes/pull/196)
+  * github.com/hashicorp/cap v0.3.0
+  * github.com/hashicorp/vault/api v1.9.1
+  * k8s.io/api v0.27.2
+  * k8s.io/apimachinery v0.27.2
+
+## 0.15.1 (March 27, 2023)
+
 ### Changes
 
 * enable plugin multiplexing [GH-186](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/186)
 * update dependencies
-  * `github.com/hashicorp/vault/api` v1.9.0
-  * `github.com/hashicorp/vault/sdk` v0.8.1
+   * `github.com/hashicorp/vault/api` v1.9.0
+   * `github.com/hashicorp/vault/sdk` v0.8.1
+   * `github.com/go-test/deep` v1.0.8 -> v1.1.0
+   * `github.com/hashicorp/go-hclog` v1.3.1 -> v1.5.0
+   * `k8s.io/api` v0.25.3 -> v0.26.3
+   * `k8s.io/apimachinery` v0.25.3 -> v0.26.3
 
 ## 0.15.0 (February 9, 2023)
 

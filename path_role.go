@@ -27,8 +27,10 @@ func pathsRole(b *kubeAuthBackend) []*framework.Path {
 			HelpSynopsis:    strings.TrimSpace(roleHelp["role-list"][0]),
 			HelpDescription: strings.TrimSpace(roleHelp["role-list"][1]),
 			DisplayAttrs: &framework.DisplayAttributes{
-				Navigation: true,
-				ItemType:   "Role",
+				OperationPrefix: operationPrefixKubernetes,
+				OperationSuffix: "auth-roles",
+				Navigation:      true,
+				ItemType:        "Role",
 			},
 		},
 		{
@@ -103,8 +105,10 @@ default: %q
 			HelpSynopsis:    strings.TrimSpace(roleHelp["role"][0]),
 			HelpDescription: strings.TrimSpace(roleHelp["role"][1]),
 			DisplayAttrs: &framework.DisplayAttributes{
-				ItemType: "Role",
-				Action:   "Create",
+				OperationPrefix: operationPrefixKubernetes,
+				OperationSuffix: "auth-role",
+				ItemType:        "Role",
+				Action:          "Create",
 			},
 		},
 	}
@@ -361,7 +365,7 @@ type roleStorageEntry struct {
 	ServiceAccountNamespaces []string `json:"bound_service_account_namespaces" mapstructure:"bound_service_account_namespaces" structs:"bound_service_account_namespaces"`
 
 	// Audience is an optional jwt claim to verify
-	Audience string `json:"audience" mapstructure:"audience" structs: "audience"`
+	Audience string `json:"audience" mapstructure:"audience" structs:"audience"`
 
 	// AliasNameSource used when deriving the Alias' name.
 	AliasNameSource string `json:"alias_name_source" mapstructure:"alias_name_source" structs:"alias_name_source"`
