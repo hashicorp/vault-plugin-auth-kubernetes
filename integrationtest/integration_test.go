@@ -167,7 +167,7 @@ func TestSuccessWithNamespaceLabels(t *testing.T) {
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  os.Getenv("KUBERNETES_JWT"),
+		"jwt":  createToken(t, "vault", nil),
 	})
 	if err != nil {
 		t.Fatalf("Expected successful login but got: %v", err)
