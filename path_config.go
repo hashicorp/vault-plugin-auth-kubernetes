@@ -44,7 +44,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 			},
 			"token_reviewer_jwt": {
 				Type: framework.TypeString,
-				Description: `A service account JWT used to access the
+				Description: `A service account JWT (or other token) used as a bearer token to access the
 TokenReview API to validate other JWTs during login. If not set
 the JWT used for login will be used to access the API.`,
 				DisplayAttrs: &framework.DisplayAttributes{
