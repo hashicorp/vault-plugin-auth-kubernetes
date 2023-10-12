@@ -2,7 +2,7 @@
 
 ### Changes
 
-* Updated dependencies [GHH-209](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/209):
+* Updated dependencies [GH-209](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/209):
   * `github.com/hashicorp/cap` v0.3.4 -> v0.4.0
   * `github.com/hashicorp/go-sockaddr` v1.0.2 -> v1.0.5
   * `github.com/hashicorp/vault/api` v1.9.2 -> v1.10.0
