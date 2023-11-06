@@ -18,6 +18,7 @@ import (
 
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/helper/pluginutil"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
@@ -326,12 +327,27 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 	}
 
 	// Read local JWT token unless it was not stored in config.
-	if config.TokenReviewerJWT == "" {
+	if config.TokenReviewerJWT == "" && config.IdentityTokenAudience == "" {
 		config.TokenReviewerJWT, err = b.localSATokenReader.ReadFile()
 		if err != nil {
 			// Ignore error: make the best effort trying to load local JWT,
 			// otherwise the JWT submitted in login payload will be used.
 			b.Logger().Debug("failed to read local service account token, will use client token", "error", err)
+		}
+	} else if config.IdentityTokenAudience != "" {
+		resp, err := b.System().GenerateIdentityToken(ctx, pluginutil.IdentityTokenRequest{
+			Key:      config.IdentityTokenKey,
+			Audience: config.IdentityTokenAudience,
+			TTL:      config.identityTokenTTL(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate plugin identity token: %w", err)
+		}
+		b.Logger().Info("created plugin identity token", "token", resp.Token)
+		config.TokenReviewerJWT = resp.Token
+		if resp.TTL < config.identityTokenTTL() {
+			b.Logger().Debug("generated plugin identity token has shorter TTL than requested",
+				"requested", config.IdentityTokenTTLSeconds, "actual", resp.TTL)
 		}
 	}
 

@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"time"
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -88,6 +89,29 @@ then this plugin will use kubernetes.io/serviceaccount as the default issuer.
 					Name: "Disable use of local CA and service account JWT",
 				},
 			},
+			"identity_token_audience": {
+				Type:        framework.TypeString,
+				Description: "",
+				Default:     "",
+				DisplayAttrs: &framework.DisplayAttributes{
+					Name: "",
+				},
+			},
+			"identity_token_key": {
+				Type:        framework.TypeString,
+				Description: "",
+				Default:     "",
+				DisplayAttrs: &framework.DisplayAttributes{
+					Name: "",
+				},
+			},
+			"identity_token_ttl": {
+				Type:        framework.TypeDurationSecond,
+				Description: "",
+				DisplayAttrs: &framework.DisplayAttributes{
+					Name: "",
+				},
+			},
 		},
 
 		Operations: map[logical.Operation]framework.OperationHandler{
@@ -151,20 +175,26 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	issuer := data.Get("issuer").(string)
 	disableIssValidation := data.Get("disable_iss_validation").(bool)
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
+	identityTokenAudience := data.Get("identity_token_audience").(string)
+	identityTokenKey := data.Get("identity_token_key").(string)
+	identityTokenTTL := data.Get("identity_token_ttl").(int)
 
 	if disableLocalJWT && caCert == "" {
 		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
 	}
 
 	config := &kubeConfig{
-		PublicKeys:           make([]crypto.PublicKey, len(pemList)),
-		PEMKeys:              pemList,
-		Host:                 host,
-		CACert:               caCert,
-		TokenReviewerJWT:     tokenReviewer,
-		Issuer:               issuer,
-		DisableISSValidation: disableIssValidation,
-		DisableLocalCAJwt:    disableLocalJWT,
+		PublicKeys:              make([]crypto.PublicKey, len(pemList)),
+		PEMKeys:                 pemList,
+		Host:                    host,
+		CACert:                  caCert,
+		TokenReviewerJWT:        tokenReviewer,
+		Issuer:                  issuer,
+		DisableISSValidation:    disableIssValidation,
+		DisableLocalCAJwt:       disableLocalJWT,
+		IdentityTokenAudience:   identityTokenAudience,
+		IdentityTokenKey:        identityTokenKey,
+		IdentityTokenTTLSeconds: identityTokenTTL,
 	}
 
 	var err error
@@ -205,6 +235,13 @@ type kubeConfig struct {
 	CACert string `json:"ca_cert"`
 	// TokenReviewJWT is the bearer to use during the TokenReview API call
 	TokenReviewerJWT string `json:"token_reviewer_jwt"`
+	// IdentityTokenKey is the name of the signing key to use from the identity/ mount.
+	IdentityTokenKey string
+	// IdentityTokenTTLSeconds is the TTL of created identity tokens in seconds.
+	IdentityTokenTTLSeconds int
+	// IdentityTokenAudience is the audience for plugin identity tokens. If using
+	// Kubernetes' OIDC directly, must match the cluster's --oidc-client-id flag.
+	IdentityTokenAudience string `json:"identity_token_audience"`
 	// Issuer is the claim that specifies who issued the token
 	Issuer string `json:"issuer"`
 	// DisableISSValidation is optional parameter to allow to skip ISS validation
@@ -213,6 +250,10 @@ type kubeConfig struct {
 	// the local CA cert and service account jwt when running in a Kubernetes
 	// pod
 	DisableLocalCAJwt bool `json:"disable_local_ca_jwt"`
+}
+
+func (k kubeConfig) identityTokenTTL() time.Duration {
+	return time.Duration(k.IdentityTokenTTLSeconds) * time.Second
 }
 
 // PasrsePublicKeyPEM is used to parse RSA and ECDSA public keys from PEMs
