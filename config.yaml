@@ -1,0 +1,17 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+kubeadmConfigPatches:
+  - |
+    apiVersion: kubeadm.k8s.io/v1beta3
+    kind: ClusterConfiguration
+    metadata:
+      name: config
+    apiServer:
+      extraArgs:
+        "oidc-issuer-url": "https://a3e4-217-155-41-120.ngrok.io/v1/identity/oidc"
+        "oidc-client-id": "https://kubernetes.default.svc.cluster.local"
+        "oidc-username-claim": "sub"
+        "oidc-username-prefix": "vault-oidc:"
