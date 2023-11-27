@@ -341,7 +341,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 	// verify the namespace is allowed
 	valid := false
 	if role.ServiceAccountNamespaceSelector != "" {
-		if valid, err = b.nsValidatorFactory(config).ValidateLabels(ctx, client, sa.namespace(), role.ServiceAccountNamespaceSelector); err != nil {
+		if valid, err = b.nsValidateFactory(config).ValidateLabels(ctx, client, sa.namespace(), role.ServiceAccountNamespaceSelector); err != nil {
 			return nil, err
 		}
 	}

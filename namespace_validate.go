@@ -23,17 +23,17 @@ type namespaceValidator interface {
 type namespaceValidateFactory func(*kubeConfig) namespaceValidator
 
 // This is the real implementation that calls the kubernetes API
-type namespaceValidatorAPI struct {
+type namespaceValidateAPI struct {
 	config *kubeConfig
 }
 
-func namespaceValidatorAPIFactory(config *kubeConfig) namespaceValidator {
-	return &namespaceValidatorAPI{
+func namespaceValidateAPIFactory(config *kubeConfig) namespaceValidator {
+	return &namespaceValidateAPI{
 		config: config,
 	}
 }
 
-func (v *namespaceValidatorAPI) ValidateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string) (bool, error) {
+func (v *namespaceValidateAPI) ValidateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string) (bool, error) {
 	labelSelector, err := makeLabelSelector(namespaceSelector)
 	if err != nil {
 		return false, err
@@ -59,7 +59,7 @@ func makeLabelSelector(selector string) (metav1.LabelSelector, error) {
 	return labelSelector, nil
 }
 
-func (v *namespaceValidatorAPI) getNamespaceLabels(ctx context.Context, client *http.Client, namespace string) (map[string]string, error) {
+func (v *namespaceValidateAPI) getNamespaceLabels(ctx context.Context, client *http.Client, namespace string) (map[string]string, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/%s", strings.TrimSuffix(v.config.Host, "/"), namespace)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

@@ -286,7 +286,7 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 	}
 
 	b.(*kubeAuthBackend).reviewFactory = testMockTokenReviewFactory
-	b.(*kubeAuthBackend).nsValidatorFactory = testMockNamespaceValidateFactory
+	b.(*kubeAuthBackend).nsValidateFactory = testMockNamespaceValidateFactory
 	return b, storage
 }
 
