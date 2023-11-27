@@ -54,7 +54,7 @@ are allowed.`,
 					Type: framework.TypeString,
 					Description: `A label selector for Kubernetes namespaces which are allowed to access this role.
 Accepts either a JSON or YAML object. If set with bound_service_account_namespaces,
-the conditions are disjuncted.`,
+the conditions are ORed.`,
 				},
 				"audience": {
 					Type:        framework.TypeString,

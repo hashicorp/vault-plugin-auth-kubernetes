@@ -341,17 +341,12 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 	// verify the namespace is allowed
 	valid := false
 	if role.ServiceAccountNamespaceSelector != "" {
-		labelSelector, err := makeLabelSelector(role.ServiceAccountNamespaceSelector)
-		if err != nil {
+		if valid, err = b.nsValidatorFactory(config).ValidateLabels(ctx, client, sa.namespace(), role.ServiceAccountNamespaceSelector); err != nil {
 			return nil, err
 		}
-		valid, err = b.nsValidatorFactory(config).ValidateLabels(ctx, client, sa.namespace(), labelSelector)
-		if err != nil {
-			return nil, err
-		}
-		if !valid && len(role.ServiceAccountNamespaces) == 0 {
-			return nil, logical.CodedError(http.StatusForbidden, "namespace not authorized")
-		}
+	}
+	if !valid && len(role.ServiceAccountNamespaces) == 0 {
+		return nil, logical.CodedError(http.StatusForbidden, "namespace not authorized")
 	}
 	if !valid && (len(role.ServiceAccountNamespaces) > 1 || role.ServiceAccountNamespaces[0] != "*") {
 		if !strutil.StrListContainsGlob(role.ServiceAccountNamespaces, sa.namespace()) {

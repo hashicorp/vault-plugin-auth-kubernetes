@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -17,10 +17,10 @@ import (
 
 // This exists so we can use a mock namespace validation when running tests
 type namespaceValidator interface {
-	ValidateLabels(context.Context, *http.Client, string, metav1.LabelSelector) (bool, error)
+	ValidateLabels(context.Context, *http.Client, string, string) (bool, error)
 }
 
-type namespaceValidatorFactory func(*kubeConfig) namespaceValidator
+type namespaceValidateFactory func(*kubeConfig) namespaceValidator
 
 // This is the real implementation that calls the kubernetes API
 type namespaceValidatorAPI struct {
@@ -33,17 +33,20 @@ func namespaceValidatorAPIFactory(config *kubeConfig) namespaceValidator {
 	}
 }
 
-func (v *namespaceValidatorAPI) ValidateLabels(ctx context.Context, client *http.Client, namespace string, selector metav1.LabelSelector) (bool, error) {
+func (v *namespaceValidatorAPI) ValidateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string) (bool, error) {
+	labelSelector, err := makeLabelSelector(namespaceSelector)
+	if err != nil {
+		return false, err
+	}
 	nsLabels, err := v.getNamespaceLabels(ctx, client, namespace)
 	if err != nil {
 		return false, err
 	}
-
-	labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
 	if err != nil {
 		return false, err
 	}
-	return labelSelector.Matches(labels.Set(nsLabels)), nil
+	return selector.Matches(labels.Set(nsLabels)), nil
 }
 
 func makeLabelSelector(selector string) (metav1.LabelSelector, error) {
@@ -63,26 +66,18 @@ func (v *namespaceValidatorAPI) getNamespaceLabels(ctx context.Context, client *
 		return nil, err
 	}
 
-	// If we have a configured TokenReviewer JWT use it as the bearer, otherwise
-	// try to use the passed in JWT.
+	// Use the configured TokenReviewer JWT as the bearer
 	if v.config.TokenReviewerJWT == "" {
 		return nil, errors.New("namespace lookup failed: TokenReviewer JWT needs to be configured to use namespace selectors")
 	}
 	bearer := fmt.Sprintf("Bearer %s", v.config.TokenReviewerJWT)
-	bearer = strings.TrimSpace(bearer)
-
-	// Set the JWT as the Bearer token
-	req.Header.Set("Authorization", bearer)
-
-	// Set the MIME type headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	setRequestHeader(req, bearer)
 
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +97,7 @@ type mockNamespaceValidator struct {
 	labels map[string]string
 }
 
-func mockNamespaceValidatorFactory(labels map[string]string) namespaceValidatorFactory {
+func mockNamespaceValidateFactory(labels map[string]string) namespaceValidateFactory {
 	return func(config *kubeConfig) namespaceValidator {
 		return &mockNamespaceValidator{
 			labels: labels,
@@ -110,10 +105,14 @@ func mockNamespaceValidatorFactory(labels map[string]string) namespaceValidatorF
 	}
 }
 
-func (v *mockNamespaceValidator) ValidateLabels(ctx context.Context, client *http.Client, namespace string, selector metav1.LabelSelector) (bool, error) {
-	labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
+func (v *mockNamespaceValidator) ValidateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string) (bool, error) {
+	labelSelector, err := makeLabelSelector(namespaceSelector)
 	if err != nil {
 		return false, err
 	}
-	return labelSelector.Matches(labels.Set(v.labels)), nil
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		return false, err
+	}
+	return selector.Matches(labels.Set(v.labels)), nil
 }

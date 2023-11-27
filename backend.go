@@ -84,7 +84,7 @@ type kubeAuthBackend struct {
 	// namespace properties (currently labels). Currently, the only options
 	// are using the kubernetes API or mocking the validation. Mocks should
 	// only be used in tests.
-	nsValidatorFactory namespaceValidatorFactory
+	nsValidatorFactory namespaceValidateFactory
 
 	// localSATokenReader caches the service account token in memory.
 	// It periodically reloads the token to support token rotation/renewal.

@@ -39,11 +39,11 @@ const (
 )
 
 var (
-	testNamespace                     = "default"
-	testName                          = "vault-auth"
-	testUID                           = "d77f89bc-9055-11e7-a068-0800276d99bf"
-	testMockTokenReviewFactory        = mockTokenReviewFactory(testName, testNamespace, testUID)
-	testMockNamespaceValidatorFactory = mockNamespaceValidatorFactory(map[string]string{"key": "value", "other": "label"})
+	testNamespace                    = "default"
+	testName                         = "vault-auth"
+	testUID                          = "d77f89bc-9055-11e7-a068-0800276d99bf"
+	testMockTokenReviewFactory       = mockTokenReviewFactory(testName, testNamespace, testUID)
+	testMockNamespaceValidateFactory = mockNamespaceValidateFactory(map[string]string{"key": "value", "other": "label"})
 
 	testGlobbedNamespace = "def*"
 	testGlobbedName      = "vault-*"
@@ -286,7 +286,7 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 	}
 
 	b.(*kubeAuthBackend).reviewFactory = testMockTokenReviewFactory
-	b.(*kubeAuthBackend).nsValidatorFactory = testMockNamespaceValidatorFactory
+	b.(*kubeAuthBackend).nsValidatorFactory = testMockNamespaceValidateFactory
 	return b, storage
 }
 
