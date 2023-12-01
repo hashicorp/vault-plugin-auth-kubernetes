@@ -99,6 +99,7 @@ default: %q
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: b.pathRoleCreateUpdate,
 				logical.UpdateOperation: b.pathRoleCreateUpdate,
+				logical.PatchOperation:  b.pathRolePatch,
 				logical.ReadOperation:   b.pathRoleRead,
 				logical.DeleteOperation: b.pathRoleDelete,
 			},
@@ -227,17 +228,72 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	b.l.Lock()
 	defer b.l.Unlock()
 
+	role := &roleStorageEntry{}
+
+	if err := role.ParseTokenFields(req, data); err != nil {
+		return logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
+	}
+
+	// Handle upgrade cases
+	role.handleLegacyFieldDefinitions(data)
+
+	if err := role.validateTokenLifetimes(b); err != nil {
+		return err, nil
+	}
+
+	var resp *logical.Response
+	if role.TokenMaxTTL > b.System().MaxLeaseTTL() {
+		resp = &logical.Response{}
+		resp.AddWarning("max_ttl is greater than the system or backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
+	}
+
+	role.ServiceAccountNames = data.Get("bound_service_account_names").([]string)
+	role.ServiceAccountNamespaces = data.Get("bound_service_account_namespaces").([]string)
+
+	if err := role.validateServiceAccountMetadata(); err != nil {
+		return err, nil
+	}
+
+	role.Audience = data.Get("audience").(string)
+	role.AliasNameSource = data.Get("alias_name_source").(string)
+
+	if err := validateAliasNameSource(role.AliasNameSource); err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+
+	// Store the entry.
+	entry, err := logical.StorageEntryJSON("role/"+strings.ToLower(roleName), role)
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil {
+		return nil, fmt.Errorf("failed to create storage entry for role %s", roleName)
+	}
+	if err = req.Storage.Put(ctx, entry); err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// pathRolePatch patches an existing role with provided options
+func (b *kubeAuthBackend) pathRolePatch(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	roleName := data.Get("name").(string)
+	if roleName == "" {
+		return logical.ErrorResponse("missing role name"), nil
+	}
+
+	b.l.Lock()
+	defer b.l.Unlock()
+
 	// Check if the role already exists
 	role, err := b.role(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a new entry object if this is a CreateOperation
-	if role == nil && req.Operation == logical.CreateOperation {
-		role = &roleStorageEntry{}
-	} else if role == nil {
-		return nil, fmt.Errorf("role entry not found during update operation")
+	if role == nil {
+		return logical.ErrorResponse("Unable to fetch role entry to patch"), nil
 	}
 
 	if err := role.ParseTokenFields(req, data); err != nil {
@@ -245,41 +301,10 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	}
 
 	// Handle upgrade cases
-	{
-		if err := tokenutil.UpgradeValue(data, "policies", "token_policies", &role.Policies, &role.TokenPolicies); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
+	role.handleLegacyFieldDefinitions(data)
 
-		if err := tokenutil.UpgradeValue(data, "bound_cidrs", "token_bound_cidrs", &role.BoundCIDRs, &role.TokenBoundCIDRs); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "num_uses", "token_num_uses", &role.NumUses, &role.TokenNumUses); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "ttl", "token_ttl", &role.TTL, &role.TokenTTL); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "max_ttl", "token_max_ttl", &role.MaxTTL, &role.TokenMaxTTL); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-
-		if err := tokenutil.UpgradeValue(data, "period", "token_period", &role.Period, &role.TokenPeriod); err != nil {
-			return logical.ErrorResponse(err.Error()), nil
-		}
-	}
-
-	if role.TokenPeriod > b.System().MaxLeaseTTL() {
-		return logical.ErrorResponse(fmt.Sprintf("token period of '%q' is greater than the backend's maximum lease TTL of '%q'", role.TokenPeriod.String(), b.System().MaxLeaseTTL().String())), nil
-	}
-
-	// Check that the TTL value provided is less than the MaxTTL.
-	// Sanitizing the TTL and MaxTTL is not required now and can be performed
-	// at credential issue time.
-	if role.TokenMaxTTL > time.Duration(0) && role.TokenTTL > role.TokenMaxTTL {
-		return logical.ErrorResponse("token ttl should not be greater than token max ttl"), nil
+	if err := role.validateTokenLifetimes(b); err != nil {
+		return err, nil
 	}
 
 	var resp *logical.Response
@@ -293,27 +318,15 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	} else if req.Operation == logical.CreateOperation {
 		role.ServiceAccountNames = data.Get("bound_service_account_names").([]string)
 	}
-	// Verify names was not empty
-	if len(role.ServiceAccountNames) == 0 {
-		return logical.ErrorResponse("%q can not be empty", "bound_service_account_names"), nil
-	}
-	// Verify * was not set with other data
-	if len(role.ServiceAccountNames) > 1 && strutil.StrListContains(role.ServiceAccountNames, "*") {
-		return logical.ErrorResponse("can not mix %q with values", "*"), nil
-	}
 
 	if namespaces, ok := data.GetOk("bound_service_account_namespaces"); ok {
 		role.ServiceAccountNamespaces = namespaces.([]string)
 	} else if req.Operation == logical.CreateOperation {
 		role.ServiceAccountNamespaces = data.Get("bound_service_account_namespaces").([]string)
 	}
-	// Verify namespaces is not empty
-	if len(role.ServiceAccountNamespaces) == 0 {
-		return logical.ErrorResponse("%q can not be empty", "bound_service_account_namespaces"), nil
-	}
-	// Verify * was not set with other data
-	if len(role.ServiceAccountNamespaces) > 1 && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
-		return logical.ErrorResponse("can not mix %q with values", "*"), nil
+
+	if err := role.validateServiceAccountMetadata(); err != nil {
+		return err, nil
 	}
 
 	// optional audience field
@@ -350,6 +363,72 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	}
 
 	return resp, nil
+}
+
+func (role *roleStorageEntry) handleLegacyFieldDefinitions(data *framework.FieldData) *logical.Response {
+	if err := tokenutil.UpgradeValue(data, "policies", "token_policies", &role.Policies, &role.TokenPolicies); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "bound_cidrs", "token_bound_cidrs", &role.BoundCIDRs, &role.TokenBoundCIDRs); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "num_uses", "token_num_uses", &role.NumUses, &role.TokenNumUses); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "ttl", "token_ttl", &role.TTL, &role.TokenTTL); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "max_ttl", "token_max_ttl", &role.MaxTTL, &role.TokenMaxTTL); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+
+	if err := tokenutil.UpgradeValue(data, "period", "token_period", &role.Period, &role.TokenPeriod); err != nil {
+		return logical.ErrorResponse(err.Error())
+	}
+	return nil
+}
+
+func (role *roleStorageEntry) validateTokenLifetimes(backend *kubeAuthBackend) *logical.Response {
+	if role.TokenPeriod > backend.System().MaxLeaseTTL() {
+		return logical.ErrorResponse(
+			fmt.Sprintf(
+				"token period of '%q' is greater than the backend's maximum lease TTL of '%q'",
+				role.TokenPeriod.String(),
+				backend.System().MaxLeaseTTL().String(),
+			),
+		)
+	}
+
+	// Check that the TTL value provided is less than the MaxTTL.
+	// Sanitizing the TTL and MaxTTL is not required now and can be performed
+	// at credential issue time.
+	if role.TokenMaxTTL > time.Duration(0) && role.TokenTTL > role.TokenMaxTTL {
+		return logical.ErrorResponse("token ttl should not be greater than token max ttl")
+	}
+	return nil
+}
+
+func (role *roleStorageEntry) validateServiceAccountMetadata() *logical.Response {
+	if len(role.ServiceAccountNames) == 0 {
+		return logical.ErrorResponse("%q can not be empty", "bound_service_account_names")
+	}
+	// Verify * was not set with other data
+	if len(role.ServiceAccountNames) > 1 && strutil.StrListContains(role.ServiceAccountNames, "*") {
+		return logical.ErrorResponse("can not mix %q with values", "*")
+	}
+	// Verify namespaces is not empty
+	if len(role.ServiceAccountNamespaces) == 0 {
+		return logical.ErrorResponse("%q can not be empty", "bound_service_account_namespaces")
+	}
+	// Verify * was not set with other data
+	if len(role.ServiceAccountNamespaces) > 1 && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
+		return logical.ErrorResponse("can not mix %q with values", "*")
+	}
+	return nil
 }
 
 // roleStorageEntry stores all the options that are set on an role
