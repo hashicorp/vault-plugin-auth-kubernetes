@@ -84,7 +84,7 @@ func (v *namespaceValidateAPI) getNamespaceLabels(ctx context.Context, client *h
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to get namespace (code %d): %s", resp.StatusCode, body)
 	}
-	ns := v1.Namespace{}
+	var ns v1.Namespace
 
 	err = json.Unmarshal(body, &ns)
 	if err != nil {
