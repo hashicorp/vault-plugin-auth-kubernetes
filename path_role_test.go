@@ -26,7 +26,7 @@ const (
 	}
 }`
 
-	badJSONSelector = `{
+	invalidJSONSelector = `{
 	"matchLabels":
 		"stage": "prod",
 		"app": "vault"
