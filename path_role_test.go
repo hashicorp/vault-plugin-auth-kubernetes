@@ -28,15 +28,14 @@ const (
 
 	invalidJSONSelector = `{
 	"matchLabels":
-		"stage": "prod",
-		"app": "vault"
+		"stage"
 }`
 
-	goodYAMLSelector = `matchLabels:
+	validYAMLSelector = `matchLabels:
   stage: prod
   app: vault
 `
-	badYAMLSelector = `matchLabels:
+	invalidYAMLSelector = `matchLabels:
 - stage: prod
 - app: vault
 `
@@ -139,7 +138,7 @@ func TestPath_Create(t *testing.T) {
 		"namespace_selector": {
 			data: map[string]interface{}{
 				"bound_service_account_names":              "name",
-				"bound_service_account_namespace_selector": goodJSONSelector,
+				"bound_service_account_namespace_selector": validJSONSelector,
 				"policies":          "test",
 				"period":            "3s",
 				"ttl":               "1s",
@@ -160,7 +159,7 @@ func TestPath_Create(t *testing.T) {
 				Period:                          3 * time.Second,
 				ServiceAccountNames:             []string{"name"},
 				ServiceAccountNamespaces:        []string(nil),
-				ServiceAccountNamespaceSelector: goodJSONSelector,
+				ServiceAccountNamespaceSelector: validJSONSelector,
 				TTL:                             1 * time.Second,
 				MaxTTL:                          5 * time.Second,
 				NumUses:                         12,
@@ -172,7 +171,7 @@ func TestPath_Create(t *testing.T) {
 			data: map[string]interface{}{
 				"bound_service_account_names":              "name",
 				"bound_service_account_namespaces":         "namespace1,namespace2",
-				"bound_service_account_namespace_selector": goodYAMLSelector,
+				"bound_service_account_namespace_selector": validYAMLSelector,
 				"policies":          "test",
 				"period":            "3s",
 				"ttl":               "1s",
@@ -193,7 +192,7 @@ func TestPath_Create(t *testing.T) {
 				Period:                          3 * time.Second,
 				ServiceAccountNames:             []string{"name"},
 				ServiceAccountNamespaces:        []string{"namespace1", "namespace2"},
-				ServiceAccountNamespaceSelector: goodYAMLSelector,
+				ServiceAccountNamespaceSelector: validYAMLSelector,
 				TTL:                             1 * time.Second,
 				MaxTTL:                          5 * time.Second,
 				NumUses:                         12,
@@ -214,17 +213,29 @@ func TestPath_Create(t *testing.T) {
 			},
 			wantErr: errInvalidAliasNameSource,
 		},
-		"invalid_namespace_label_selector": {
+		"invalid_namespace_label_selector_in_json": {
 			data: map[string]interface{}{
 				"bound_service_account_names":              "name",
-				"bound_service_account_namespace_selector": badYAMLSelector,
+				"bound_service_account_namespace_selector": invalidJSONSelector,
 				"policies": "test",
 				"period":   "3s",
 				"ttl":      "1s",
 				"num_uses": 12,
 				"max_ttl":  "5s",
 			},
-			wantErr: errors.New(`failed to parse "bound_service_account_namespace_selector" as k8s.io/api/meta/v1/LabelSelector object`),
+			wantErr: errors.New(`invalid "bound_service_account_namespace_selector" configured`),
+		},
+		"invalid_namespace_label_selector_in_yaml": {
+			data: map[string]interface{}{
+				"bound_service_account_names":              "name",
+				"bound_service_account_namespace_selector": invalidYAMLSelector,
+				"policies": "test",
+				"period":   "3s",
+				"ttl":      "1s",
+				"num_uses": 12,
+				"max_ttl":  "5s",
+			},
+			wantErr: errors.New(`invalid "bound_service_account_namespace_selector" configured`),
 		},
 		"no_service_account_names": {
 			data: map[string]interface{}{
@@ -307,7 +318,7 @@ func TestPath_Read(t *testing.T) {
 	configData := map[string]interface{}{
 		"bound_service_account_names":              "name",
 		"bound_service_account_namespaces":         "namespace",
-		"bound_service_account_namespace_selector": goodJSONSelector,
+		"bound_service_account_namespace_selector": validJSONSelector,
 		"policies": "test",
 		"period":   "3s",
 		"ttl":      "1s",
@@ -318,7 +329,7 @@ func TestPath_Read(t *testing.T) {
 	expected := map[string]interface{}{
 		"bound_service_account_names":              []string{"name"},
 		"bound_service_account_namespaces":         []string{"namespace"},
-		"bound_service_account_namespace_selector": goodJSONSelector,
+		"bound_service_account_namespace_selector": validJSONSelector,
 		"token_policies":                           []string{"test"},
 		"policies":                                 []string{"test"},
 		"token_period":                             int64(3),
