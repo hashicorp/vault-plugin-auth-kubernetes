@@ -80,11 +80,11 @@ type kubeAuthBackend struct {
 	// review. Mocks should only be used in tests.
 	reviewFactory tokenReviewFactory
 
-	// nsValidateFactory is used to configure the strategy for validating
+	// namespaceValidatorFactory is used to configure the strategy for validating
 	// namespace properties (currently labels). Currently, the only options
 	// are using the kubernetes API or mocking the validation. Mocks should
 	// only be used in tests.
-	nsValidateFactory namespaceValidateFactory
+	namespaceValidatorFactory namespaceValidatorFactory
 
 	// localSATokenReader caches the service account token in memory.
 	// It periodically reloads the token to support token rotation/renewal.
@@ -139,8 +139,8 @@ func Backend() *kubeAuthBackend {
 		// Set the default TLSConfig
 		tlsConfig: getDefaultTLSConfig(),
 		// Set the review factory to default to calling into the kubernetes API.
-		reviewFactory:     tokenReviewAPIFactory,
-		nsValidateFactory: namespaceValidateAPIFactory,
+		reviewFactory:             tokenReviewAPIFactory,
+		namespaceValidatorFactory: newNsValidatorWrapper,
 	}
 
 	b.Backend = &framework.Backend{

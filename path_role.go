@@ -167,15 +167,9 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 
 	// Create a map of data to be returned
 	d := map[string]interface{}{
-		"bound_service_account_names": role.ServiceAccountNames,
-	}
-
-	if len(role.ServiceAccountNamespaces) > 0 {
-		d["bound_service_account_namespaces"] = role.ServiceAccountNamespaces
-	}
-
-	if role.ServiceAccountNamespaceSelector != "" {
-		d["bound_service_account_namespace_selector"] = role.ServiceAccountNamespaceSelector
+		"bound_service_account_names":              role.ServiceAccountNames,
+		"bound_service_account_namespaces":         role.ServiceAccountNamespaces,
+		"bound_service_account_namespace_selector": role.ServiceAccountNamespaceSelector,
 	}
 
 	if role.Audience != "" {
@@ -319,9 +313,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		role.ServiceAccountNamespaces = namespaces.([]string)
 	}
 
-	if namespaceSelector, ok := data.GetOk("bound_service_account_namespace_selector"); ok {
-		role.ServiceAccountNamespaceSelector = namespaceSelector.(string)
-	}
+	role.ServiceAccountNamespaceSelector = data.Get("bound_service_account_namespace_selector").(string)
 
 	// Verify namespaces is not empty unless selector is set
 	if len(role.ServiceAccountNamespaces) == 0 && role.ServiceAccountNamespaceSelector == "" {

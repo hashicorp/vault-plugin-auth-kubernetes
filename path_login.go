@@ -126,7 +126,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 
 	client, err := b.getHTTPClient()
 	if err != nil {
-		b.Logger().Error(`Failed to get the HTTP client`, "err", err)
+		b.Logger().Error("Failed to get the HTTP client", "err", err)
 		return nil, logical.ErrUnrecoverable
 	}
 
@@ -249,7 +249,7 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 	// are authentic.
 	client, err := b.getHTTPClient()
 	if err != nil {
-		b.Logger().Error(`Failed to get the HTTP client`, "err", err)
+		b.Logger().Error("Failed to get the HTTP client", "err", err)
 		return nil, logical.ErrUnrecoverable
 	}
 
@@ -341,7 +341,8 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 	// verify the namespace is allowed
 	valid := false
 	if role.ServiceAccountNamespaceSelector != "" {
-		if valid, err = b.nsValidateFactory(config).ValidateLabels(ctx, client, sa.namespace(), role.ServiceAccountNamespaceSelector); err != nil {
+		if valid, err = b.namespaceValidatorFactory(config).validateLabels(ctx,
+			client, sa.namespace(), role.ServiceAccountNamespaceSelector); err != nil {
 			return nil, err
 		}
 	}
