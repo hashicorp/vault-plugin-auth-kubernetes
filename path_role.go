@@ -322,7 +322,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	// Verify namespace selector is correct
 	if role.ServiceAccountNamespaceSelector != "" {
 		if _, err := makeLabelSelector(role.ServiceAccountNamespaceSelector); err != nil {
-			return logical.ErrorResponse("failed to parse %q as k8s.io/api/meta/v1/LabelSelector object", "bound_service_account_namespace_selector"), nil
+			return logical.ErrorResponse("invalid %q configured", "bound_service_account_namespace_selector"), nil
 		}
 	}
 
