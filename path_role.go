@@ -319,7 +319,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	if len(role.ServiceAccountNamespaces) == 0 && role.ServiceAccountNamespaceSelector == "" {
 		return logical.ErrorResponse("%q can not be empty if %q is not set", "bound_service_account_namespaces", "bound_service_account_namespace_selector"), nil
 	}
-	
+
 	// Verify namespace selector is correct
 	if role.ServiceAccountNamespaceSelector != "" {
 		if _, err := makeLabelSelector(role.ServiceAccountNamespaceSelector); err != nil {
