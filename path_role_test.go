@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	goodJSONSelector = `{
+	validJSONSelector = `{
 	"matchLabels": {
 		"stage": "prod",
 		"app": "vault"
