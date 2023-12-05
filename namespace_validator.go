@@ -10,8 +10,10 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8s_yaml "k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -70,8 +72,14 @@ func (v *namespaceValidatorWrapper) getNamespaceLabels(ctx context.Context, clie
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to get namespace (code %d)", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		errStatus := &metav1.Status{}
+		err = json.Unmarshal(body, errStatus)
+		if err == nil && errStatus.Status != metav1.StatusSuccess {
+			return nil, fmt.Errorf("failed to get namespace (code %d status %s)",
+				resp.StatusCode, kubeerrors.FromObject(runtime.Object(errStatus)))
+		}
+		return nil, fmt.Errorf("failed to parse error status on namespace retrieval failure err=%s", err)
 	}
 	var ns v1.Namespace
 	err = json.Unmarshal(body, &ns)
