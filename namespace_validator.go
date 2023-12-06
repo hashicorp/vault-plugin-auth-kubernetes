@@ -24,7 +24,7 @@ type namespaceValidator interface {
 
 type namespaceValidatorFactory func(*kubeConfig) namespaceValidator
 
-// This is the real implementation that calls the kubernetes API
+// namespaceValidatorWrapper implements the namespaceValidator interface
 type namespaceValidatorWrapper struct {
 	config *kubeConfig
 }
