@@ -73,13 +73,15 @@ func (v *namespaceValidatorWrapper) getNamespaceLabels(ctx context.Context, clie
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		errStatus := &metav1.Status{}
-		err = json.Unmarshal(body, errStatus)
-		if err == nil && errStatus.Status != metav1.StatusSuccess {
-			return nil, fmt.Errorf("failed to get namespace (code %d status %s)",
-				resp.StatusCode, kubeerrors.FromObject(runtime.Object(errStatus)))
+		var errStatus metav1.Status
+		if err = json.Unmarshal(body, &errStatus); err != nil {
+			return nil, fmt.Errorf("failed to parse error status on namespace retrieval failure err=%s", err)
 		}
-		return nil, fmt.Errorf("failed to parse error status on namespace retrieval failure err=%s", err)
+
+		if errStatus.Status != metav1.StatusSuccess {
+			return nil, fmt.Errorf("failed to get namespace (code %d status %s)",
+				resp.StatusCode, kubeerrors.FromObject(runtime.Object(&errStatus)))
+		}
 	}
 	var ns v1.Namespace
 	err = json.Unmarshal(body, &ns)

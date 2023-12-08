@@ -36,6 +36,11 @@ const (
 		"key": "value"
 	}
 }`
+	mismatchLabelsKeyValue = `{
+	"matchLabels": {
+		"foo": "bar"
+	}
+}`
 )
 
 var (
@@ -259,18 +264,15 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 	}
 
 	data = map[string]interface{}{
-		"bound_service_account_names":      config.saName,
-		"bound_service_account_namespaces": config.saNamespace,
-		"policies":                         "test",
-		"period":                           "3s",
-		"ttl":                              "1s",
-		"num_uses":                         12,
-		"max_ttl":                          "5s",
-		"alias_name_source":                config.aliasNameSource,
-	}
-
-	if config.saNamespaceSelector != "" {
-		data["bound_service_account_namespace_selector"] = config.saNamespaceSelector
+		"bound_service_account_names":              config.saName,
+		"bound_service_account_namespaces":         config.saNamespace,
+		"bound_service_account_namespace_selector": config.saNamespaceSelector,
+		"policies":          "test",
+		"period":            "3s",
+		"ttl":               "1s",
+		"num_uses":          12,
+		"max_ttl":           "5s",
+		"alias_name_source": config.aliasNameSource,
 	}
 
 	req = &logical.Request{
@@ -775,31 +777,64 @@ func TestLoginSvcAcctAndNamespaceSplats(t *testing.T) {
 }
 
 func TestLoginSvcAcctNamespaceSelector(t *testing.T) {
-	config := defaultTestBackendConfig()
-	config.saName = "*"
-	config.saNamespace = "non-default"
-	config.saNamespaceSelector = matchLabelsKeyValue
-	b, storage := setupBackend(t, config)
-
-	// test successful login
-	data := map[string]interface{}{
-		"role": "plugin-test",
-		"jwt":  jwtGoodDataToken,
-	}
-
-	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "login",
-		Storage:   storage,
-		Data:      data,
-		Connection: &logical.Connection{
-			RemoteAddr: "127.0.0.1",
+	testCases := map[string]struct {
+		saNamespaceSelector string
+		errExpected         bool
+		expectedErrCode     int
+	}{
+		"matchNamespaceSelector": {
+			saNamespaceSelector: matchLabelsKeyValue,
+		},
+		"mismatchNamespaceSelector": {
+			saNamespaceSelector: mismatchLabelsKeyValue,
+			errExpected:         true,
+			expectedErrCode:     http.StatusForbidden,
 		},
 	}
 
-	resp, err := b.HandleRequest(context.Background(), req)
-	if err != nil || (resp != nil && resp.IsError()) {
-		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			config := defaultTestBackendConfig()
+			config.saName = "*"
+			config.saNamespace = "non-default"
+			config.saNamespaceSelector = tc.saNamespaceSelector
+			b, storage := setupBackend(t, config)
+
+			data := map[string]interface{}{
+				"role": "plugin-test",
+				"jwt":  jwtGoodDataToken,
+			}
+
+			req := &logical.Request{
+				Operation: logical.UpdateOperation,
+				Path:      "login",
+				Storage:   storage,
+				Data:      data,
+				Connection: &logical.Connection{
+					RemoteAddr: "127.0.0.1",
+				},
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			if tc.errExpected {
+				var actual error
+				if err != nil {
+					actual = err
+				} else if resp != nil && resp.IsError() {
+					actual = resp.Error()
+				} else {
+					t.Fatalf("expected error")
+				}
+
+				if tc.expectedErrCode != 0 {
+					requireErrorCode(t, actual, tc.expectedErrCode)
+				}
+			} else {
+				if err != nil || (resp != nil && resp.IsError()) {
+					t.Fatalf("err:%s resp:%#v\n", err, resp)
+				}
+			}
+		})
 	}
 }
 

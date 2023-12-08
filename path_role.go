@@ -316,8 +316,10 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	role.ServiceAccountNamespaceSelector = data.Get("bound_service_account_namespace_selector").(string)
 
 	// Verify namespaces is not empty unless selector is set
-	if len(role.ServiceAccountNamespaces) == 0 && role.ServiceAccountNamespaceSelector == "" {
-		return logical.ErrorResponse("%q can not be empty if %q is not set", "bound_service_account_namespaces", "bound_service_account_namespace_selector"), nil
+	saNamespaceLen := len(role.ServiceAccountNamespaces)
+	if saNamespaceLen == 0 && role.ServiceAccountNamespaceSelector == "" {
+		return logical.ErrorResponse("%q can not be empty if %q is not set",
+			"bound_service_account_namespaces", "bound_service_account_namespace_selector"), nil
 	}
 
 	// Verify namespace selector is correct
@@ -328,7 +330,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	}
 
 	// Verify * was not set with other data
-	if len(role.ServiceAccountNamespaces) > 1 && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
+	if saNamespaceLen > 1 && strutil.StrListContains(role.ServiceAccountNamespaces, "*") {
 		return logical.ErrorResponse("can not mix %q with values", "*"), nil
 	}
 

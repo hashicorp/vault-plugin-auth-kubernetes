@@ -288,7 +288,8 @@ func (keySet DontVerifySignature) VerifySignature(_ context.Context, token strin
 }
 
 // parseAndValidateJWT is used to parse, validate and lookup the JWT token.
-func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.Client, jwtStr string, role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.Client, jwtStr string,
+	role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
 	expected := capjwt.Expected{
 		SigningAlgorithms: supportedJwtAlgs,
 	}
@@ -339,20 +340,26 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 	}
 
 	// verify the namespace is allowed
-	valid := false
-	if role.ServiceAccountNamespaceSelector != "" {
-		if valid, err = b.namespaceValidatorFactory(config).validateLabels(ctx,
-			client, sa.namespace(), role.ServiceAccountNamespaceSelector); err != nil {
-			return nil, err
+	var allowed bool
+	codedErr := logical.CodedError(http.StatusForbidden, "namespace not authorized")
+	if len(role.ServiceAccountNamespaces) != 0 {
+		if role.ServiceAccountNamespaces[0] == "*" ||
+			strutil.StrListContainsGlob(role.ServiceAccountNamespaces, sa.namespace()) {
+			allowed = true
 		}
 	}
-	if !valid && len(role.ServiceAccountNamespaces) == 0 {
-		return nil, logical.CodedError(http.StatusForbidden, "namespace not authorized")
-	}
-	if !valid && (len(role.ServiceAccountNamespaces) > 1 || role.ServiceAccountNamespaces[0] != "*") {
-		if !strutil.StrListContainsGlob(role.ServiceAccountNamespaces, sa.namespace()) {
-			return nil, logical.CodedError(http.StatusForbidden, "namespace not authorized")
+
+	if !allowed && role.ServiceAccountNamespaceSelector != "" {
+		if ok, err := b.namespaceValidatorFactory(config).validateLabels(ctx,
+			client, sa.namespace(), role.ServiceAccountNamespaceSelector); !ok {
+			codedErr = logical.CodedError(http.StatusForbidden, fmt.Sprintf("namespace not authorized err=%s", err))
+		} else {
+			allowed = true
 		}
+	}
+
+	if !allowed {
+		return nil, codedErr
 	}
 
 	// verify the service account name is allowed
