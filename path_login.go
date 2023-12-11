@@ -341,24 +341,24 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 
 	// verify the namespace is allowed
 	var allowed bool
-	codedErr := logical.CodedError(http.StatusForbidden, "namespace not authorized")
-	if len(role.ServiceAccountNamespaces) != 0 {
-		if role.ServiceAccountNamespaces[0] == "*" ||
-			strutil.StrListContainsGlob(role.ServiceAccountNamespaces, sa.namespace()) {
+	if len(role.ServiceAccountNamespaces) > 0 {
+		if role.ServiceAccountNamespaces[0] == "*" || strutil.StrListContainsGlob(role.ServiceAccountNamespaces, sa.namespace()) {
 			allowed = true
 		}
 	}
 
+	// verify the namespace selector matches the namespace
 	if !allowed && role.ServiceAccountNamespaceSelector != "" {
-		if ok, err := b.namespaceValidatorFactory(config).validateLabels(ctx,
-			client, sa.namespace(), role.ServiceAccountNamespaceSelector); !ok {
-			codedErr = logical.CodedError(http.StatusForbidden, fmt.Sprintf("namespace not authorized err=%s", err))
-		} else {
-			allowed = true
-		}
+		allowed, err = b.namespaceValidatorFactory(config).validateLabels(ctx,
+			client, sa.namespace(), role.ServiceAccountNamespaceSelector)
 	}
 
 	if !allowed {
+		errMsg := "namespace not authorized"
+		if err != nil {
+			errMsg = fmt.Sprintf("%s err=%s", errMsg, err)
+		}
+		codedErr := logical.CodedError(http.StatusForbidden, errMsg)
 		return nil, codedErr
 	}
 
