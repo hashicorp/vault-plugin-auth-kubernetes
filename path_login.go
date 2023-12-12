@@ -339,6 +339,14 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 		return nil, err
 	}
 
+	// verify the service account name is allowed
+	if len(role.ServiceAccountNames) > 1 || role.ServiceAccountNames[0] != "*" {
+		if !strutil.StrListContainsGlob(role.ServiceAccountNames, sa.name()) {
+			return nil, logical.CodedError(http.StatusForbidden,
+				fmt.Sprintf("service account name not authorized"))
+		}
+	}
+
 	// verify the namespace is allowed
 	var allowed bool
 	if len(role.ServiceAccountNamespaces) > 0 {
@@ -360,14 +368,6 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 		}
 		codedErr := logical.CodedError(http.StatusForbidden, errMsg)
 		return nil, codedErr
-	}
-
-	// verify the service account name is allowed
-	if len(role.ServiceAccountNames) > 1 || role.ServiceAccountNames[0] != "*" {
-		if !strutil.StrListContainsGlob(role.ServiceAccountNames, sa.name()) {
-			return nil, logical.CodedError(http.StatusForbidden,
-				fmt.Sprintf("service account name not authorized"))
-		}
 	}
 
 	// If we don't have any public keys to verify, return the sa and end early.

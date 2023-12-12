@@ -48,7 +48,8 @@ var (
 	testName                         = "vault-auth"
 	testUID                          = "d77f89bc-9055-11e7-a068-0800276d99bf"
 	testMockTokenReviewFactory       = mockTokenReviewFactory(testName, testNamespace, testUID)
-	testMockNamespaceValidateFactory = mockNamespaceValidateFactory(map[string]string{"key": "value", "other": "label"})
+	testMockNamespaceValidateFactory = mockNamespaceValidateFactory(
+		map[string]string{"key": "value", "other": "label"})
 
 	testGlobbedNamespace = "def*"
 	testGlobbedName      = "vault-*"

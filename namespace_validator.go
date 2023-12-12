@@ -36,18 +36,21 @@ func newNsValidatorWrapper(config *kubeConfig) namespaceValidator {
 }
 
 func (v *namespaceValidatorWrapper) validateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string) (bool, error) {
-	labelSelector, err := makeLabelSelector(namespaceSelector)
+	labelSelector, err := makeNsLabelSelector(namespaceSelector)
 	if err != nil {
 		return false, err
 	}
+
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		return false, err
+	}
+
 	nsLabels, err := v.getNamespaceLabels(ctx, client, namespace)
 	if err != nil {
 		return false, err
 	}
-	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
-	if err != nil {
-		return false, err
-	}
+
 	return selector.Matches(labels.Set(nsLabels)), nil
 }
 
@@ -91,13 +94,31 @@ func (v *namespaceValidatorWrapper) getNamespaceLabels(ctx context.Context, clie
 	return ns.Labels, nil
 }
 
-func makeLabelSelector(selector string) (metav1.LabelSelector, error) {
+func makeLabelSelector(selector string) (*metav1.LabelSelector, error) {
 	labelSelector := metav1.LabelSelector{}
 	decoder := k8s_yaml.NewYAMLOrJSONDecoder(strings.NewReader(selector), len(selector))
 	err := decoder.Decode(&labelSelector)
 	if err != nil {
-		return labelSelector, err
+		return nil, err
 	}
+
+	return &labelSelector, nil
+}
+
+func makeNsLabelSelector(namespaceSelector string) (*metav1.LabelSelector, error) {
+	if namespaceSelector == "" {
+		return nil, fmt.Errorf("namespace selector is empty")
+	}
+
+	labelSelector, err := makeLabelSelector(namespaceSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	if labelSelector.MatchExpressions != nil {
+		return nil, fmt.Errorf("label selector match expressions are not supported")
+	}
+
 	return labelSelector, nil
 }
 
@@ -114,11 +135,11 @@ func mockNamespaceValidateFactory(labels map[string]string) namespaceValidatorFa
 }
 
 func (v *mockNamespaceValidator) validateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string) (bool, error) {
-	labelSelector, err := makeLabelSelector(namespaceSelector)
+	labelSelector, err := makeNsLabelSelector(namespaceSelector)
 	if err != nil {
 		return false, err
 	}
-	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
 		return false, err
 	}

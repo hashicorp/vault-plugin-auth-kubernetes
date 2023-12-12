@@ -324,7 +324,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 
 	// Verify namespace selector is correct
 	if role.ServiceAccountNamespaceSelector != "" {
-		if _, err := makeLabelSelector(role.ServiceAccountNamespaceSelector); err != nil {
+		if _, err := makeNsLabelSelector(role.ServiceAccountNamespaceSelector); err != nil {
 			return logical.ErrorResponse("invalid %q configured", "bound_service_account_namespace_selector"), nil
 		}
 	}
