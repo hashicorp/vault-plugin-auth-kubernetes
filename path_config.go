@@ -119,11 +119,6 @@ func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Reque
 	} else if config == nil {
 		return nil, nil
 	} else {
-		var tokenReviewerJWTSet bool
-		if config.TokenReviewerJWT != "" {
-			tokenReviewerJWTSet = true
-		}
-
 		// Create a map of data to be returned
 		resp := &logical.Response{
 			Data: map[string]interface{}{
