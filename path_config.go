@@ -133,7 +133,7 @@ func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Reque
 				"issuer":                 config.Issuer,
 				"disable_iss_validation": config.DisableISSValidation,
 				"disable_local_ca_jwt":   config.DisableLocalCAJwt,
-				"token_reviewer_jwt_set": tokenReviewerJWTSet,
+				"token_reviewer_jwt_set": config.TokenReviewerJWT != "",
 			},
 		}
 
