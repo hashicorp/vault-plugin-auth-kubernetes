@@ -44,25 +44,20 @@ func setupLocalFiles(t *testing.T, b logical.Backend) func() {
 }
 
 func TestConfig_Read(t *testing.T) {
-	type args struct {
-		data map[string]interface{}
-	}
 	tests := []struct {
 		name string
-		args args
+		data map[string]interface{}
 		want map[string]interface{}
 	}{
 		{
 			name: "token-review-jwt-is-unset",
-			args: args{
-				data: map[string]interface{}{
-					"pem_keys":               []string{testRSACert, testECCert},
-					"kubernetes_host":        "host",
-					"kubernetes_ca_cert":     testCACert,
-					"issuer":                 "",
-					"disable_iss_validation": false,
-					"disable_local_ca_jwt":   false,
-				},
+			data: map[string]interface{}{
+				"pem_keys":               []string{testRSACert, testECCert},
+				"kubernetes_host":        "host",
+				"kubernetes_ca_cert":     testCACert,
+				"issuer":                 "",
+				"disable_iss_validation": false,
+				"disable_local_ca_jwt":   false,
 			},
 			want: map[string]interface{}{
 				"pem_keys":               []string{testRSACert, testECCert},
@@ -76,16 +71,14 @@ func TestConfig_Read(t *testing.T) {
 		},
 		{
 			name: "token-review-jwt-is-set",
-			args: args{
-				data: map[string]interface{}{
-					"pem_keys":               []string{testRSACert, testECCert},
-					"kubernetes_host":        "host",
-					"kubernetes_ca_cert":     testCACert,
-					"issuer":                 "",
-					"disable_iss_validation": false,
-					"disable_local_ca_jwt":   false,
-					"token_reviewer_jwt":     "test-token-review-jwt",
-				},
+			data: map[string]interface{}{
+				"pem_keys":               []string{testRSACert, testECCert},
+				"kubernetes_host":        "host",
+				"kubernetes_ca_cert":     testCACert,
+				"issuer":                 "",
+				"disable_iss_validation": false,
+				"disable_local_ca_jwt":   false,
+				"token_reviewer_jwt":     "test-token-review-jwt",
 			},
 			want: map[string]interface{}{
 				"pem_keys":               []string{testRSACert, testECCert},
@@ -100,36 +93,39 @@ func TestConfig_Read(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		b, storage := getBackend(t)
-		cleanup := setupLocalFiles(t, b)
-		defer cleanup()
-		req := &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      tc.args.data,
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			b, storage := getBackend(t)
+			cleanup := setupLocalFiles(t, b)
+			t.Cleanup(cleanup)
 
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
+			req := &logical.Request{
+				Operation: logical.UpdateOperation,
+				Path:      configPath,
+				Storage:   storage,
+				Data:      tc.data,
+			}
 
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      nil,
-		}
+			resp, err := b.HandleRequest(context.Background(), req)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
 
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
+			req = &logical.Request{
+				Operation: logical.ReadOperation,
+				Path:      configPath,
+				Storage:   storage,
+				Data:      nil,
+			}
 
-		if !reflect.DeepEqual(resp.Data, tc.want) {
-			t.Fatalf("Expected did not equal actual: expected %#v\n got %#v\n", tc.want, resp.Data)
-		}
+			resp, err = b.HandleRequest(context.Background(), req)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
+
+			if !reflect.DeepEqual(resp.Data, tc.want) {
+				t.Fatalf("Expected did not equal actual: expected %#v\n got %#v\n", tc.want, resp.Data)
+			}
+		})
 	}
 }
 
