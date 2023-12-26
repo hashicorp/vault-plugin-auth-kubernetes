@@ -119,7 +119,7 @@ func TestConfig_Read(t *testing.T) {
 
 			resp, err = b.HandleRequest(context.Background(), req)
 			if err != nil || (resp != nil && resp.IsError()) {
-				t.Fatalf("err:%s resp:%#v\n", err, resp)
+				t.Fatalf("got unexpected error %s for resp %#v", err, resp)
 			}
 
 			if !reflect.DeepEqual(resp.Data, tc.want) {
