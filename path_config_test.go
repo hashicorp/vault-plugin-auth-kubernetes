@@ -123,7 +123,7 @@ func TestConfig_Read(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(resp.Data, tc.want) {
-				t.Fatalf("Expected did not equal actual: expected %#v\n got %#v\n", tc.want, resp.Data)
+				t.Fatalf("expected %#v, got %#v", tc.want, resp.Data)
 			}
 		})
 	}
