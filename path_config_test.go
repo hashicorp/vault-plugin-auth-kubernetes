@@ -109,7 +109,7 @@ func TestConfig_Read(t *testing.T) {
 			if err != nil || (resp != nil && resp.IsError()) {
 				t.Fatalf("got unexpected error %s for resp %#v", err, resp)
 			}
-			
+
 			req = &logical.Request{
 				Operation: logical.ReadOperation,
 				Path:      configPath,
