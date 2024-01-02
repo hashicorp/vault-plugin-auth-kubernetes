@@ -47,10 +47,10 @@ var (
 	testNamespace                    = "default"
 	testName                         = "vault-auth"
 	testUID                          = "d77f89bc-9055-11e7-a068-0800276d99bf"
+	testMetadataAnnotations          = map[string]string{"key": "value", "foo": "bar"}
 	testMockTokenReviewFactory       = mockTokenReviewFactory(testName, testNamespace, testUID)
 	testMockNamespaceValidateFactory = mockNamespaceValidateFactory(
 		map[string]string{"key": "value", "other": "label"})
-
 	testGlobbedNamespace = "def*"
 	testGlobbedName      = "vault-*"
 
@@ -290,6 +290,13 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 
 	b.(*kubeAuthBackend).reviewFactory = testMockTokenReviewFactory
 	b.(*kubeAuthBackend).namespaceValidatorFactory = testMockNamespaceValidateFactory
+
+	sa := v1.ObjectMeta{Annotations: map[string]string{}}
+	for k, v := range testMetadataAnnotations {
+		sa.Annotations[fmt.Sprintf("%s%s", annotationKeyPrefix, k)] = v
+	}
+	b.(*kubeAuthBackend).serviceAccountGetterFactory = mockServiceAccountGetterFactory(sa)
+
 	return b, storage
 }
 
@@ -836,6 +843,34 @@ func TestLoginSvcAcctNamespaceSelector(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLoginEntityAliasCustomMetadataAssignment(t *testing.T) {
+	b, storage := setupBackend(t, defaultTestBackendConfig())
+
+	data := map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  jwtGoodDataToken,
+	}
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+		Connection: &logical.Connection{
+			RemoteAddr: "127.0.0.1",
+		},
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if !reflect.DeepEqual(resp.Auth.Alias.CustomMetadata, testMetadataAnnotations) {
+		t.Fatalf("expected %#v, got %#v", testMetadataAnnotations, resp.Auth.Alias.CustomMetadata)
 	}
 }
 

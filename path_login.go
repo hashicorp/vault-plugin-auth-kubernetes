@@ -130,7 +130,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrUnrecoverable
 	}
 
-	serviceAccount, err := b.parseAndValidateJWT(ctx, client, jwtStr, role, config)
+	sa, err := b.parseAndValidateJWT(ctx, client, jwtStr, role, config)
 	if err != nil {
 		if err == jose.ErrCryptoFailure || strings.Contains(err.Error(), "verifying token signature") {
 			b.Logger().Debug(`login unauthorized`, "err", err)
@@ -139,20 +139,25 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 
-	aliasName, err := b.getAliasName(role, serviceAccount)
+	aliasName, err := b.getAliasName(role, sa)
 	if err != nil {
 		return nil, err
 	}
 
 	// look up the JWT token in the kubernetes API
-	err = serviceAccount.lookup(ctx, client, jwtStr, role.Audience, b.reviewFactory(config))
-
+	err = sa.lookup(ctx, client, jwtStr, role.Audience, b.reviewFactory(config))
 	if err != nil {
 		b.Logger().Debug(`login unauthorized`, "err", err)
 		return nil, logical.ErrPermissionDenied
 	}
 
-	uid, err := serviceAccount.uid()
+	annotations, err := b.serviceAccountGetterFactory(config).annotations(ctx, client, sa.Namespace, sa.Name)
+	if err != nil {
+		b.Logger().Debug("failed to get service account annotations", "err", err)
+		return nil, err
+	}
+
+	uid, err := sa.uid()
 	if err != nil {
 		return nil, err
 	}
@@ -161,22 +166,23 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 			Name: aliasName,
 			Metadata: map[string]string{
 				"service_account_uid":         uid,
-				"service_account_name":        serviceAccount.name(),
-				"service_account_namespace":   serviceAccount.namespace(),
-				"service_account_secret_name": serviceAccount.SecretName,
+				"service_account_name":        sa.name(),
+				"service_account_namespace":   sa.namespace(),
+				"service_account_secret_name": sa.SecretName,
 			},
+			CustomMetadata: annotations,
 		},
 		InternalData: map[string]interface{}{
 			"role": roleName,
 		},
 		Metadata: map[string]string{
 			"service_account_uid":         uid,
-			"service_account_name":        serviceAccount.name(),
-			"service_account_namespace":   serviceAccount.namespace(),
-			"service_account_secret_name": serviceAccount.SecretName,
+			"service_account_name":        sa.name(),
+			"service_account_namespace":   sa.namespace(),
+			"service_account_secret_name": sa.SecretName,
 			"role":                        roleName,
 		},
-		DisplayName: fmt.Sprintf("%s-%s", serviceAccount.namespace(), serviceAccount.name()),
+		DisplayName: fmt.Sprintf("%s-%s", sa.namespace(), sa.name()),
 	}
 
 	role.PopulateTokenAuth(auth)
