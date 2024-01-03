@@ -220,6 +220,25 @@ func TestFailWithBadTokenReviewerJwt(t *testing.T) {
 	}
 }
 
+func TestAuthAliasCustomMetadataAssignment(t *testing.T) {
+	// TODO annotate serviceaccount with "auth-metadata.vault.hashicorp.com/foo" : "bar"
+
+	client, cleanup := setupKubernetesAuth(t, "vault", nil, nil)
+	defer cleanup()
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+		"role": "test-role",
+		"jwt":  createToken(t, "vault", nil),
+	})
+	if err != nil {
+		t.Fatalf("Expected successful login but got: %v", err)
+	}
+
+	// TODO query the alias that has the entity ID matching the service account uid
+
+	// TODO compare its custom metadata to the vault auth annotations
+}
+
 func TestUnauthorizedServiceAccountErrorCode(t *testing.T) {
 	client, cleanup := setupKubernetesAuth(t, "badServiceAccount", nil, nil)
 	defer cleanup()
