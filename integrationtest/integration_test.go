@@ -304,7 +304,7 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 	}
 
 	if len(expMetadata) != metadataMatches {
-		t.Fatalf("Expected %d matching key value entries from alias metadata %#v but got: %d",
+		t.Fatalf("Expected %d matching key value pairs from alias metadata %#v but got: %d",
 			len(expMetadata), secret.Data, metadataMatches)
 	}
 }
