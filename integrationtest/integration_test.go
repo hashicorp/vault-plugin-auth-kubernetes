@@ -77,6 +77,29 @@ func createToken(t *testing.T, sa string, audiences []string) string {
 	return resp.Status.Token
 }
 
+func annotateServiceAccount(t *testing.T, name string, annotations map[string]string) {
+	t.Helper()
+
+	k8sClient, err := k8s.ClientFromKubeConfig(os.Getenv("KUBE_CONTEXT"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sa, err := k8sClient.CoreV1().ServiceAccounts("test").Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for k, v := range annotations {
+		sa.Annotations[k] = v
+	}
+
+	sa, err = k8sClient.CoreV1().ServiceAccounts("test").Update(context.Background(), sa, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func setupKubernetesAuth(t *testing.T, boundServiceAccountName string, mountConfigOverride map[string]interface{}, roleConfigOverride map[string]interface{}) (*api.Client, func()) {
 	t.Helper()
 	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
@@ -221,7 +244,18 @@ func TestFailWithBadTokenReviewerJwt(t *testing.T) {
 }
 
 func TestAuthAliasCustomMetadataAssignment(t *testing.T) {
-	// TODO annotate serviceaccount with "auth-metadata.vault.hashicorp.com/foo" : "bar"
+	// annotate the service account
+	expCustomMetadata := map[string]string{
+		"foo": "bar",
+		"bar": "baz",
+	}
+
+	annotationPrefix := "auth-metadata.vault.hashicorp.com/"
+	annotations := map[string]string{}
+	for k, v := range expCustomMetadata {
+		annotations[annotationPrefix+k] = v
+	}
+	annotateServiceAccount(t, "vault", annotations)
 
 	client, cleanup := setupKubernetesAuth(t, "vault", nil, nil)
 	defer cleanup()
@@ -234,9 +268,34 @@ func TestAuthAliasCustomMetadataAssignment(t *testing.T) {
 		t.Fatalf("Expected successful login but got: %v", err)
 	}
 
-	// TODO query the alias that has the entity ID matching the service account uid
+	// query the entity alias and match up its custom metadata
+	secret, err := client.Logical().List("identity/entity-alias/id")
+	if err != nil {
+		t.Fatalf("Expected successful entity-alias list but got: %v", err)
+	}
 
-	// TODO compare its custom metadata to the vault auth annotations
+	customMetadataMatches := 0
+	for k, v := range secret.Data {
+		if k != "key_info" {
+			continue
+		}
+
+		keyInfo := v.(map[string]interface{})
+		for _, info := range keyInfo {
+			infoMap := info.(map[string]interface{})
+			customMetadata := infoMap["custom_metadata"].(map[string]string)
+			for expK, expV := range expCustomMetadata {
+				if realK, ok := customMetadata[expK]; ok && realK == expV {
+					customMetadataMatches += 1
+				}
+			}
+		}
+	}
+
+	if len(expCustomMetadata) != customMetadataMatches {
+		t.Fatalf("Expected %d matching key value entries from alias custom metadata %#v but got: %d",
+			len(expCustomMetadata), secret.Data, customMetadataMatches)
+	}
 }
 
 func TestUnauthorizedServiceAccountErrorCode(t *testing.T) {

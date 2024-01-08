@@ -151,7 +151,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrPermissionDenied
 	}
 
-	annotations, err := b.serviceAccountGetterFactory(config).annotations(ctx, client, sa.Namespace, sa.Name)
+	annotations, err := b.serviceAccountGetterFactory(config).annotations(ctx, client, sa.namespace(), sa.name())
 	if err != nil {
 		b.Logger().Debug("failed to get service account annotations", "err", err)
 		return nil, err
