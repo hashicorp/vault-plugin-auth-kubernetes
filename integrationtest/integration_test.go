@@ -291,7 +291,7 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected successful entity-alias GET request but got: %v", err)
 		}
-		
+
 		v, ok = secret.Data["canonical_id"]
 		if !ok {
 			t.Fatal("Expected entity-alias GET response to have \"canonical_id\"")

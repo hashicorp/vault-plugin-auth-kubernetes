@@ -309,7 +309,8 @@ func (keySet DontVerifySignature) VerifySignature(_ context.Context, token strin
 
 // parseAndValidateJWT is used to parse, validate and lookup the JWT token.
 func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.Client, jwtStr string,
-	role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+	role *roleStorageEntry, config *kubeConfig,
+) (*serviceAccount, error) {
 	expected := capjwt.Expected{
 		SigningAlgorithms: supportedJwtAlgs,
 	}
