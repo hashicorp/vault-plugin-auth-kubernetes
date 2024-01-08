@@ -260,7 +260,7 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 	client, cleanup := setupKubernetesAuth(t, "vault", nil, nil)
 	defer cleanup()
 
-	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+	loginSecret, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
 		"jwt":  createToken(t, "vault", nil),
 	})
@@ -284,28 +284,40 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 		t.Fatal("Expected entity-alias LIST response to have non-empty \"keys\"")
 	}
 
-	// query the entity alias and match up its custom metadata
-	secret, err = client.Logical().Read(fmt.Sprintf("identity/entity-alias/id/%s", keys[0]))
-	if err != nil {
-		t.Fatalf("Expected successful entity-alias GET request but got: %v", err)
-	}
-
-	v, ok = secret.Data["metadata"]
-	if !ok {
-		t.Fatal("Expected entity-alias GET response to have \"metadata\"")
-	}
-
 	metadataMatches := 0
-	metadata := v.(map[string]interface{})
-	for expK, expV := range expMetadata {
-		if realK, ok := metadata[expK]; ok && realK.(string) == expV {
-			metadataMatches += 1
+	for _, key := range keys {
+		// find the entity-alias that belongs to the login's entity
+		secret, err = client.Logical().Read(fmt.Sprintf("identity/entity-alias/id/%s", key))
+		if err != nil {
+			t.Fatalf("Expected successful entity-alias GET request but got: %v", err)
 		}
-	}
+		
+		v, ok = secret.Data["canonical_id"]
+		if !ok {
+			t.Fatal("Expected entity-alias GET response to have \"canonical_id\"")
+		}
 
-	if len(expMetadata) != metadataMatches {
-		t.Fatalf("Expected %d matching key value pairs from alias metadata %#v but got: %d",
-			len(expMetadata), secret.Data, metadataMatches)
+		if v.(string) != loginSecret.Auth.EntityID {
+			continue
+		}
+
+		// check metadata
+		v, ok = secret.Data["metadata"]
+		if !ok {
+			t.Fatal("Expected entity-alias GET response to have \"metadata\"")
+		}
+
+		metadata := v.(map[string]interface{})
+		for expK, expV := range expMetadata {
+			if realK, ok := metadata[expK]; ok && realK.(string) == expV {
+				metadataMatches += 1
+			}
+		}
+
+		if len(expMetadata) != metadataMatches {
+			t.Fatalf("Expected %d matching key value pairs from alias metadata %#v but got: %d",
+				len(expMetadata), secret.Data, metadataMatches)
+		}
 	}
 }
 
