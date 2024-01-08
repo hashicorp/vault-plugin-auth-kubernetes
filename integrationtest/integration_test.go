@@ -243,16 +243,16 @@ func TestFailWithBadTokenReviewerJwt(t *testing.T) {
 	}
 }
 
-func TestAuthAliasCustomMetadataAssignment(t *testing.T) {
+func TestAuthAliasMetadataAssignment(t *testing.T) {
 	// annotate the service account
-	expCustomMetadata := map[string]string{
+	expMetadata := map[string]string{
 		"foo": "bar",
 		"bar": "baz",
 	}
 
 	annotationPrefix := "auth-metadata.vault.hashicorp.com/"
 	annotations := map[string]string{}
-	for k, v := range expCustomMetadata {
+	for k, v := range expMetadata {
 		annotations[annotationPrefix+k] = v
 	}
 	annotateServiceAccount(t, "vault", annotations)
@@ -274,27 +274,38 @@ func TestAuthAliasCustomMetadataAssignment(t *testing.T) {
 		t.Fatalf("Expected successful entity-alias list but got: %v", err)
 	}
 
-	customMetadataMatches := 0
-	for k, v := range secret.Data {
-		if k != "key_info" {
-			continue
-		}
+	v, ok := secret.Data["keys"]
+	if !ok {
+		t.Fatal("Expected entity-alias LIST response to have \"keys\"")
+	}
 
-		keyInfo := v.(map[string]interface{})
-		for _, info := range keyInfo {
-			infoMap := info.(map[string]interface{})
-			customMetadata := infoMap["custom_metadata"].(map[string]string)
-			for expK, expV := range expCustomMetadata {
-				if realK, ok := customMetadata[expK]; ok && realK == expV {
-					customMetadataMatches += 1
-				}
-			}
+	keys := v.([]interface{})
+	if len(keys) == 0 {
+		t.Fatal("Expected entity-alias LIST response to have non-empty \"keys\"")
+	}
+
+	// query the entity alias and match up its custom metadata
+	secret, err = client.Logical().Read(fmt.Sprintf("identity/entity-alias/id/%s", keys[0]))
+	if err != nil {
+		t.Fatalf("Expected successful entity-alias GET request but got: %v", err)
+	}
+
+	v, ok = secret.Data["metadata"]
+	if !ok {
+		t.Fatal("Expected entity-alias GET response to have \"metadata\"")
+	}
+
+	metadataMatches := 0
+	metadata := v.(map[string]interface{})
+	for expK, expV := range expMetadata {
+		if realK, ok := metadata[expK]; ok && realK.(string) == expV {
+			metadataMatches += 1
 		}
 	}
 
-	if len(expCustomMetadata) != customMetadataMatches {
-		t.Fatalf("Expected %d matching key value entries from alias custom metadata %#v but got: %d",
-			len(expCustomMetadata), secret.Data, customMetadataMatches)
+	if len(expMetadata) != metadataMatches {
+		t.Fatalf("Expected %d matching key value entries from alias metadata %#v but got: %d",
+			len(expMetadata), secret.Data, metadataMatches)
 	}
 }
 

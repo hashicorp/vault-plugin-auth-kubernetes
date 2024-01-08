@@ -20,6 +20,20 @@ import (
 	josejwt "gopkg.in/square/go-jose.v2/jwt"
 )
 
+const (
+	metadataKeySaUid        = "service_account_uid"
+	metadataKeySaName       = "service_account_name"
+	metadataKeySaNamespace  = "service_account_namespace"
+	metadataKeySaSecretName = "service_account_secret_name"
+)
+
+var aliasMetadataDisallowedKeys = map[string]struct{}{
+	metadataKeySaUid:        {},
+	metadataKeySaName:       {},
+	metadataKeySaNamespace:  {},
+	metadataKeySaSecretName: {},
+}
+
 // defaultJWTIssuer is used to verify the iss header on the JWT if the config doesn't specify an issuer.
 var defaultJWTIssuer = "kubernetes/serviceaccount"
 
@@ -151,7 +165,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrPermissionDenied
 	}
 
-	annotations, err := b.serviceAccountGetterFactory(config).annotations(ctx, client, sa.namespace(), sa.name())
+	annotations, err := b.serviceAccountGetterFactory(config).annotations(ctx, client, jwtStr, sa.namespace(), sa.name())
 	if err != nil {
 		b.Logger().Debug("failed to get service account annotations", "err", err)
 		return nil, err
@@ -161,26 +175,27 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	if err != nil {
 		return nil, err
 	}
+
+	metadata := annotations
+	metadata[metadataKeySaUid] = uid
+	metadata[metadataKeySaName] = sa.name()
+	metadata[metadataKeySaNamespace] = sa.namespace()
+	metadata[metadataKeySaSecretName] = sa.SecretName
+
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
-			Name: aliasName,
-			Metadata: map[string]string{
-				"service_account_uid":         uid,
-				"service_account_name":        sa.name(),
-				"service_account_namespace":   sa.namespace(),
-				"service_account_secret_name": sa.SecretName,
-			},
-			CustomMetadata: annotations,
+			Name:     aliasName,
+			Metadata: metadata,
 		},
 		InternalData: map[string]interface{}{
 			"role": roleName,
 		},
 		Metadata: map[string]string{
-			"service_account_uid":         uid,
-			"service_account_name":        sa.name(),
-			"service_account_namespace":   sa.namespace(),
-			"service_account_secret_name": sa.SecretName,
-			"role":                        roleName,
+			metadataKeySaUid:        uid,
+			metadataKeySaName:       sa.name(),
+			metadataKeySaNamespace:  sa.namespace(),
+			metadataKeySaSecretName: sa.SecretName,
+			"role":                  roleName,
 		},
 		DisplayName: fmt.Sprintf("%s-%s", sa.namespace(), sa.name()),
 	}

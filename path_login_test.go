@@ -47,7 +47,7 @@ var (
 	testNamespace                    = "default"
 	testName                         = "vault-auth"
 	testUID                          = "d77f89bc-9055-11e7-a068-0800276d99bf"
-	testMetadataAnnotations          = map[string]string{"key": "value", "foo": "bar"}
+	testMetadataAnnotations          = map[string]string{"baz": "qux", "foo": "bar"}
 	testMockTokenReviewFactory       = mockTokenReviewFactory(testName, testNamespace, testUID)
 	testMockNamespaceValidateFactory = mockNamespaceValidateFactory(
 		map[string]string{"key": "value", "other": "label"})
@@ -846,7 +846,7 @@ func TestLoginSvcAcctNamespaceSelector(t *testing.T) {
 	}
 }
 
-func TestLoginEntityAliasCustomMetadataAssignment(t *testing.T) {
+func TestLoginEntityAliasMetadataAssignment(t *testing.T) {
 	b, storage := setupBackend(t, defaultTestBackendConfig())
 
 	data := map[string]interface{}{
@@ -869,8 +869,16 @@ func TestLoginEntityAliasCustomMetadataAssignment(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	if !reflect.DeepEqual(resp.Auth.Alias.CustomMetadata, testMetadataAnnotations) {
-		t.Fatalf("expected %#v, got %#v", testMetadataAnnotations, resp.Auth.Alias.CustomMetadata)
+	for expK, expV := range testMetadataAnnotations {
+		v, ok := resp.Auth.Alias.Metadata[expK]
+
+		if !ok {
+			t.Fatalf("expected key %q not found", expK)
+		}
+
+		if v != expV {
+			t.Fatalf("expected value %q got %q for key %q", expV, v, expK)
+		}
 	}
 }
 

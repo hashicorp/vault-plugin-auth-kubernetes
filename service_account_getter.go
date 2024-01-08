@@ -3,7 +3,6 @@ package kubeauth
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,7 +18,7 @@ const annotationKeyPrefix = "auth-metadata.vault.hashicorp.com/"
 
 // serviceAccountGetter defines a namespace validator interface
 type serviceAccountGetter interface {
-	annotations(context.Context, *http.Client, string, string) (map[string]string, error)
+	annotations(context.Context, *http.Client, string, string, string) (map[string]string, error)
 }
 
 type serviceAccountGetterFactory func(*kubeConfig) serviceAccountGetter
@@ -35,7 +34,7 @@ func newServiceAccountGetterWrapper(config *kubeConfig) serviceAccountGetter {
 	}
 }
 
-func (w *serviceAccountGetterWrapper) annotations(ctx context.Context, client *http.Client, namespace, serviceAccount string) (map[string]string, error) {
+func (w *serviceAccountGetterWrapper) annotations(ctx context.Context, client *http.Client, jwtStr, namespace, serviceAccount string) (map[string]string, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/%s/serviceaccounts/%s",
 		strings.TrimSuffix(w.config.Host, "/"), namespace, serviceAccount)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -43,11 +42,13 @@ func (w *serviceAccountGetterWrapper) annotations(ctx context.Context, client *h
 		return nil, err
 	}
 
-	// Use the configured TokenReviewer JWT as the bearer
-	if w.config.TokenReviewerJWT == "" {
-		return nil, errors.New("service account lookup failed: TokenReviewer JWT needs to be configured to retrieve service accounts")
+	// If we have a configured TokenReviewer JWT use it as the bearer, otherwise
+	// try to use the passed in JWT.
+	bearer := fmt.Sprintf("Bearer %s", jwtStr)
+	if len(w.config.TokenReviewerJWT) > 0 {
+		bearer = fmt.Sprintf("Bearer %s", w.config.TokenReviewerJWT)
 	}
-	setRequestHeader(req, fmt.Sprintf("Bearer %s", w.config.TokenReviewerJWT))
+	setRequestHeader(req, bearer)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -78,6 +79,11 @@ func (w *serviceAccountGetterWrapper) annotations(ctx context.Context, client *h
 	for k, v := range sa.Annotations {
 		if strings.HasPrefix(k, annotationKeyPrefix) {
 			newK := strings.TrimPrefix(k, annotationKeyPrefix)
+
+			if _, ok := aliasMetadataDisallowedKeys[newK]; ok {
+				return nil, fmt.Errorf("key %q is reserved for internal use", newK)
+			}
+
 			annotations[newK] = v
 		}
 	}
@@ -96,7 +102,7 @@ func mockServiceAccountGetterFactory(meta metav1.ObjectMeta) serviceAccountGette
 	}
 }
 
-func (v *mockServiceAccountGetter) annotations(context.Context, *http.Client, string, string) (map[string]string, error) {
+func (v *mockServiceAccountGetter) annotations(context.Context, *http.Client, string, string, string) (map[string]string, error) {
 	annotations := map[string]string{}
 	for k, v := range v.meta.Annotations {
 		if strings.HasPrefix(k, annotationKeyPrefix) {
