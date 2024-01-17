@@ -250,7 +250,7 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 		"bar": "baz",
 	}
 
-	const annotationPrefix = "vault.hashicorp.com/"
+	const annotationPrefix = "vault.hashicorp.com/alias-metadata-"
 	annotations := map[string]string{}
 	for k, v := range expMetadata {
 		annotations[annotationPrefix+k] = v
