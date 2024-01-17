@@ -165,9 +165,12 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrPermissionDenied
 	}
 
-	annotations, err := b.serviceAccountGetterFactory(config).annotations(ctx, client, jwtStr, sa.namespace(), sa.name())
-	if err != nil {
-		return nil, err
+	annotations := map[string]string{}
+	if b.useAnnotationsAsAliasMetadata {
+		annotations, err = b.serviceAccountGetterFactory(config).annotations(ctx, client, jwtStr, sa.namespace(), sa.name())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	uid, err := sa.uid()

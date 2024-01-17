@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-const annotationKeyPrefix = "auth-metadata.vault.hashicorp.com/"
+const annotationKeyPrefix = "vault.hashicorp.com/"
 
 // serviceAccountGetter defines a namespace validator interface
 type serviceAccountGetter interface {

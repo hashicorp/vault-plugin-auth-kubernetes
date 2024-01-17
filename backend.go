@@ -115,6 +115,11 @@ type kubeAuthBackend struct {
 
 	// tlsMu provides the lock for synchronizing updates to the tlsConfig.
 	tlsMu sync.RWMutex
+
+	// useAnnotationsAsAliasMetadata indicates that annotations, with the "vault.hashicorp.com/" prefix, of the request
+	// JWT service account will be added to the alias metadata. Note the service account annotations get permission
+	// is required for the token reviewer service account.
+	useAnnotationsAsAliasMetadata bool
 }
 
 // Factory returns a new backend as logical.Backend.

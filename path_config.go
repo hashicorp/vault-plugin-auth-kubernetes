@@ -88,6 +88,16 @@ then this plugin will use kubernetes.io/serviceaccount as the default issuer.
 					Name: "Disable use of local CA and service account JWT",
 				},
 			},
+			"use_annotations_as_alias_metadata": {
+				Type: framework.TypeBool,
+				Description: `Indicate annotations, with the "vault.hashicorp.com/" prefix,
+of the request JWT service account will be added to the alias metadata. Note the service account annotations
+get permission is required for the token reviewer service account.`,
+				Default: false,
+				DisplayAttrs: &framework.DisplayAttributes{
+					Name: "Use annotations of JWT service account as alias metadata",
+				},
+			},
 		},
 
 		Operations: map[logical.Operation]framework.OperationHandler{
@@ -122,13 +132,14 @@ func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Reque
 		// Create a map of data to be returned
 		resp := &logical.Response{
 			Data: map[string]interface{}{
-				"kubernetes_host":        config.Host,
-				"kubernetes_ca_cert":     config.CACert,
-				"pem_keys":               config.PEMKeys,
-				"issuer":                 config.Issuer,
-				"disable_iss_validation": config.DisableISSValidation,
-				"disable_local_ca_jwt":   config.DisableLocalCAJwt,
-				"token_reviewer_jwt_set": config.TokenReviewerJWT != "",
+				"kubernetes_host":                   config.Host,
+				"kubernetes_ca_cert":                config.CACert,
+				"pem_keys":                          config.PEMKeys,
+				"issuer":                            config.Issuer,
+				"disable_iss_validation":            config.DisableISSValidation,
+				"disable_local_ca_jwt":              config.DisableLocalCAJwt,
+				"token_reviewer_jwt_set":            config.TokenReviewerJWT != "",
+				"use_annotations_as_alias_metadata": b.useAnnotationsAsAliasMetadata,
 			},
 		}
 
@@ -189,6 +200,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		return nil, err
 	}
 
+	b.useAnnotationsAsAliasMetadata = data.Get("use_annotations_as_alias_metadata").(bool)
 	return nil, nil
 }
 

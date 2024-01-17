@@ -250,14 +250,18 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 		"bar": "baz",
 	}
 
-	annotationPrefix := "auth-metadata.vault.hashicorp.com/"
+	const annotationPrefix = "vault.hashicorp.com/"
 	annotations := map[string]string{}
 	for k, v := range expMetadata {
 		annotations[annotationPrefix+k] = v
 	}
 	annotateServiceAccount(t, "vault", annotations)
 
-	client, cleanup := setupKubernetesAuth(t, "vault", nil, nil)
+	client, cleanup := setupKubernetesAuth(t, "vault",
+		map[string]interface{}{
+			"kubernetes_host":                   "https://kubernetes.default.svc.cluster.local",
+			"use_annotations_as_alias_metadata": true,
+		}, nil)
 	defer cleanup()
 
 	loginSecret, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{

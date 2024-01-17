@@ -225,11 +225,12 @@ func jwtSign(header string, payload string, privateKey *ecdsa.PrivateKey) string
 }
 
 type testBackendConfig struct {
-	pems                []string
-	saName              string
-	saNamespace         string
-	saNamespaceSelector string
-	aliasNameSource     string
+	pems                          []string
+	saName                        string
+	saNamespace                   string
+	saNamespaceSelector           string
+	aliasNameSource               string
+	useAnnotationsAsAliasMetadata bool
 }
 
 func defaultTestBackendConfig() *testBackendConfig {
@@ -247,9 +248,10 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 
 	// test no certificate
 	data := map[string]interface{}{
-		"pem_keys":           config.pems,
-		"kubernetes_host":    "host",
-		"kubernetes_ca_cert": testCACert,
+		"pem_keys":                          config.pems,
+		"kubernetes_host":                   "host",
+		"kubernetes_ca_cert":                testCACert,
+		"use_annotations_as_alias_metadata": config.useAnnotationsAsAliasMetadata,
 	}
 
 	req := &logical.Request{
@@ -847,7 +849,10 @@ func TestLoginSvcAcctNamespaceSelector(t *testing.T) {
 }
 
 func TestLoginEntityAliasMetadataAssignment(t *testing.T) {
-	b, storage := setupBackend(t, defaultTestBackendConfig())
+	config := defaultTestBackendConfig()
+	config.useAnnotationsAsAliasMetadata = true
+
+	b, storage := setupBackend(t, config)
 
 	data := map[string]interface{}{
 		"role": "plugin-test",
