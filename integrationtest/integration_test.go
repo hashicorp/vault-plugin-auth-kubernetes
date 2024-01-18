@@ -100,7 +100,38 @@ func annotateServiceAccount(t *testing.T, name string, annotations map[string]st
 	}
 }
 
-func setupKubernetesAuth(t *testing.T, boundServiceAccountName string, mountConfigOverride map[string]interface{}, roleConfigOverride map[string]interface{}) (*api.Client, func()) {
+func createPolicy(t *testing.T, name, policy string) func() {
+	t.Helper()
+	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
+	client, err := api.NewClient(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.Logical().Write(fmt.Sprintf("/sys/policy/%s", name), map[string]interface{}{
+		"policy": policy,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cleanup := func() {
+		_, err = client.Logical().Delete(fmt.Sprintf("/sys/policy/%s", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	defer func() {
+		if t.Failed() {
+			cleanup()
+		}
+	}()
+
+	return cleanup
+}
+
+func setupKubernetesAuth(t *testing.T, mountConfigOverride map[string]interface{}) (*api.Client, func()) {
 	t.Helper()
 	// Pick up VAULT_ADDR and VAULT_TOKEN from env vars
 	client, err := api.NewClient(nil)
@@ -140,6 +171,12 @@ func setupKubernetesAuth(t *testing.T, boundServiceAccountName string, mountConf
 		t.Fatal(err)
 	}
 
+	return client, cleanup
+}
+
+func setupKubernetesAuthRole(t *testing.T, client *api.Client, boundServiceAccountName string, roleConfigOverride map[string]interface{}) {
+	t.Helper()
+
 	roleConfig := map[string]interface{}{
 		"bound_service_account_names":      boundServiceAccountName,
 		"bound_service_account_namespaces": "test",
@@ -148,17 +185,41 @@ func setupKubernetesAuth(t *testing.T, boundServiceAccountName string, mountConf
 		roleConfig = roleConfigOverride
 	}
 
-	_, err = client.Logical().Write("auth/kubernetes/role/test-role", roleConfig)
+	_, err := client.Logical().Write("auth/kubernetes/role/test-role", roleConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
+}
 
-	return client, cleanup
+func setupKv1Mount(t *testing.T, client *api.Client, path string) func() {
+	_, err := client.Logical().Write(fmt.Sprintf("/sys/mounts/%s", path), map[string]interface{}{
+		"type": "kv",
+	})
+	if err != nil {
+		t.Fatalf("Expected to enable kv secrets engine but got: %v", err)
+	}
+
+	cleanup := func() {
+		_, err = client.Logical().Delete(fmt.Sprintf("/sys/mounts/%s", path))
+		if err != nil {
+			t.Fatalf("Expected successful kv2 secrets engine mount delete but got: %v", err)
+		}
+	}
+
+	defer func() {
+		if t.Failed() {
+			cleanup()
+		}
+	}()
+
+	return cleanup
 }
 
 func TestSuccess(t *testing.T) {
-	client, cleanup := setupKubernetesAuth(t, "vault", nil, nil)
+	client, cleanup := setupKubernetesAuth(t, nil)
 	defer cleanup()
+
+	setupKubernetesAuthRole(t, client, "vault", nil)
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
@@ -170,11 +231,13 @@ func TestSuccess(t *testing.T) {
 }
 
 func TestSuccessWithTokenReviewerJwt(t *testing.T) {
-	client, cleanup := setupKubernetesAuth(t, "vault", map[string]interface{}{
+	client, cleanup := setupKubernetesAuth(t, map[string]interface{}{
 		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
 		"token_reviewer_jwt": createToken(t, "test-token-reviewer-account", nil),
-	}, nil)
+	})
 	defer cleanup()
+
+	setupKubernetesAuthRole(t, client, "vault", nil)
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
@@ -186,12 +249,14 @@ func TestSuccessWithTokenReviewerJwt(t *testing.T) {
 }
 
 func TestSuccessWithNamespaceLabels(t *testing.T) {
+	client, cleanup := setupKubernetesAuth(t, nil)
+	defer cleanup()
+
 	roleConfigOverride := map[string]interface{}{
 		"bound_service_account_names":              "vault",
 		"bound_service_account_namespace_selector": matchLabelsKeyValue,
 	}
-	client, cleanup := setupKubernetesAuth(t, "vault", nil, roleConfigOverride)
-	defer cleanup()
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
@@ -203,12 +268,14 @@ func TestSuccessWithNamespaceLabels(t *testing.T) {
 }
 
 func TestFailWithMismatchNamespaceLabels(t *testing.T) {
+	client, cleanup := setupKubernetesAuth(t, nil)
+	defer cleanup()
+
 	roleConfigOverride := map[string]interface{}{
 		"bound_service_account_names":              "vault",
 		"bound_service_account_namespace_selector": mismatchLabelsKeyValue,
 	}
-	client, cleanup := setupKubernetesAuth(t, "vault", nil, roleConfigOverride)
-	defer cleanup()
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
@@ -224,11 +291,13 @@ func TestFailWithMismatchNamespaceLabels(t *testing.T) {
 }
 
 func TestFailWithBadTokenReviewerJwt(t *testing.T) {
-	client, cleanup := setupKubernetesAuth(t, "vault", map[string]interface{}{
+	client, cleanup := setupKubernetesAuth(t, map[string]interface{}{
 		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
 		"token_reviewer_jwt": badTokenReviewerJwt,
-	}, nil)
+	})
 	defer cleanup()
+
+	setupKubernetesAuthRole(t, client, "vault", nil)
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
@@ -246,8 +315,8 @@ func TestFailWithBadTokenReviewerJwt(t *testing.T) {
 func TestAuthAliasMetadataAssignment(t *testing.T) {
 	// annotate the service account
 	expMetadata := map[string]string{
-		"foo": "bar",
-		"bar": "baz",
+		"key-1": "foo",
+		"key-2": "bar",
 	}
 
 	const annotationPrefix = "vault.hashicorp.com/alias-metadata-"
@@ -257,12 +326,35 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 	}
 	annotateServiceAccount(t, "vault", annotations)
 
-	client, cleanup := setupKubernetesAuth(t, "vault",
-		map[string]interface{}{
-			"kubernetes_host":                   "https://kubernetes.default.svc.cluster.local",
-			"use_annotations_as_alias_metadata": true,
-		}, nil)
+	client, cleanup := setupKubernetesAuth(t, map[string]interface{}{
+		"kubernetes_host":                   "https://kubernetes.default.svc.cluster.local",
+		"use_annotations_as_alias_metadata": true,
+	})
 	defer cleanup()
+
+	// create policy
+	secret, err := client.Logical().Read("sys/auth/kubernetes")
+	if err != nil {
+		t.Fatalf("Expected successful auth configuration GET but got: %v", err)
+	}
+
+	mountAccessor, ok := secret.Data["accessor"]
+	if !ok {
+		t.Fatal("Expected auth configuration GET response to have \"accessor\"")
+	}
+
+	const policyNameFoo = "alias-metadata-foo"
+	const kvPath = "root"
+	createPolicy(t, policyNameFoo,
+		fmt.Sprintf(`path "%s/{{identity.entity.aliases.%s.metadata.key-1}}"
+	{ capabilities = [ "read", "update", "create" ] }`, kvPath, mountAccessor))
+
+	roleConfigOverride := map[string]interface{}{
+		"bound_service_account_names":      "vault",
+		"bound_service_account_namespaces": "test",
+		"policies":                         []string{"default", policyNameFoo},
+	}
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
 
 	loginSecret, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
@@ -272,62 +364,38 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 		t.Fatalf("Expected successful login but got: %v", err)
 	}
 
-	// query the entity alias and match up its custom metadata
-	secret, err := client.Logical().List("identity/entity-alias/id")
+	// verify that the templated policy works by creating key value pairs at root/data/foo with the kubernetes auth token
+	kv1MountCleanup := setupKv1Mount(t, client, kvPath)
+	defer kv1MountCleanup()
+
+	token, err := loginSecret.TokenID()
 	if err != nil {
-		t.Fatalf("Expected successful entity-alias list but got: %v", err)
+		t.Fatalf("Expected successful token ID read but got: %v", err)
 	}
 
-	v, ok := secret.Data["keys"]
-	if !ok {
-		t.Fatal("Expected entity-alias LIST response to have \"keys\"")
+	kvClient, err := api.NewClient(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kvClient.SetToken(token)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	keys := v.([]interface{})
-	if len(keys) == 0 {
-		t.Fatal("Expected entity-alias LIST response to have non-empty \"keys\"")
-	}
-
-	metadataMatches := 0
-	for _, key := range keys {
-		// find the entity-alias that belongs to the login's entity
-		secret, err = client.Logical().Read(fmt.Sprintf("identity/entity-alias/id/%s", key))
-		if err != nil {
-			t.Fatalf("Expected successful entity-alias GET request but got: %v", err)
-		}
-
-		v, ok = secret.Data["canonical_id"]
-		if !ok {
-			t.Fatal("Expected entity-alias GET response to have \"canonical_id\"")
-		}
-
-		if v.(string) != loginSecret.Auth.EntityID {
-			continue
-		}
-
-		// check metadata
-		v, ok = secret.Data["metadata"]
-		if !ok {
-			t.Fatal("Expected entity-alias GET response to have \"metadata\"")
-		}
-
-		metadata := v.(map[string]interface{})
-		for expK, expV := range expMetadata {
-			if realK, ok := metadata[expK]; ok && realK.(string) == expV {
-				metadataMatches += 1
-			}
-		}
-
-		if len(expMetadata) != metadataMatches {
-			t.Fatalf("Expected %d matching key value pairs from alias metadata %#v but got: %d",
-				len(expMetadata), secret.Data, metadataMatches)
-		}
+	err = kvClient.KVv1(kvPath).Put(context.Background(), "foo",
+		map[string]interface{}{
+			"apiKey": "abc123",
+		})
+	if err != nil {
+		t.Fatalf("Expected successful kv1 PUT but got: %v", err)
 	}
 }
 
 func TestUnauthorizedServiceAccountErrorCode(t *testing.T) {
-	client, cleanup := setupKubernetesAuth(t, "badServiceAccount", nil, nil)
+	client, cleanup := setupKubernetesAuth(t, nil)
 	defer cleanup()
+
+	setupKubernetesAuthRole(t, client, "badServiceAccount", nil)
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
@@ -369,8 +437,10 @@ func TestAudienceValidation(t *testing.T) {
 			if tc.audienceConfig != "" {
 				roleConfig["audience"] = tc.audienceConfig
 			}
-			client, cleanup := setupKubernetesAuth(t, "vault", nil, roleConfig)
+			client, cleanup := setupKubernetesAuth(t, nil)
 			defer cleanup()
+
+			setupKubernetesAuthRole(t, client, "vault", roleConfig)
 
 			login := func(jwt string) error {
 				_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
