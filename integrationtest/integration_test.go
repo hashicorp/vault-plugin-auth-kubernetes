@@ -344,7 +344,7 @@ func TestAuthAliasMetadataAssignment(t *testing.T) {
 	}
 
 	const policyNameFoo = "alias-metadata-foo"
-	const kvPath = "root"
+	const kvPath = "kv-v1"
 	createPolicy(t, policyNameFoo,
 		fmt.Sprintf(`path "%s/{{identity.entity.aliases.%s.metadata.key-1}}"
 	{ capabilities = [ "read", "update", "create" ] }`, kvPath, mountAccessor))
