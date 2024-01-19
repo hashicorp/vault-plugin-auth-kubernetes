@@ -115,20 +115,12 @@ func createPolicy(t *testing.T, name, policy string) func() {
 		t.Fatal(err)
 	}
 
-	cleanup := func() {
+	t.Cleanup(func() {
 		_, err = client.Logical().Delete(fmt.Sprintf("/sys/policy/%s", name))
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
-
-	defer func() {
-		if t.Failed() {
-			cleanup()
-		}
-	}()
-
-	return cleanup
+	})
 }
 
 func setupKubernetesAuth(t *testing.T, mountConfigOverride map[string]interface{}) (*api.Client, func()) {
