@@ -191,7 +191,7 @@ func setupKubernetesAuthRole(t *testing.T, client *api.Client, boundServiceAccou
 	}
 }
 
-func setupKv1Mount(t *testing.T, client *api.Client, path string) func() {
+func setupKVV1Mount(t *testing.T, client *api.Client, path string) func() {
 	_, err := client.Logical().Write(fmt.Sprintf("/sys/mounts/%s", path), map[string]interface{}{
 		"type": "kv",
 	})
