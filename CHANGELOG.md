@@ -1,9 +1,13 @@
 ## Unreleased
 
+### Features
+* Use annotations with the prefix "vault.hashicorp.com/alias-metadata-" from the client token's associated
+service account as alias metadata for the Vault entity [GH-226](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/226)
+
 ### Changes
 
 * Build with go 1.21.3
-* Test with k8s versions 1.24-1.28
+* Test with k8s versio[k8s](integrationtest%2Fk8s)ns 1.24-1.28
 * Updated dependencies [GH-209](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/209):
   * `github.com/hashicorp/cap` v0.3.4 -> v0.4.0
   * `github.com/hashicorp/go-sockaddr` v1.0.2 -> v1.0.5
