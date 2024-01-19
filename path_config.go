@@ -90,10 +90,11 @@ then this plugin will use kubernetes.io/serviceaccount as the default issuer.
 			},
 			"use_annotations_as_alias_metadata": {
 				Type: framework.TypeBool,
-				Description: `Use annotations from the client token's associated service account
-as alias metadata for the Vault entity. Only annotations with the prefix
-"vault.hashicorp.com/alias-metadata-" will be used. Note that Vault
-will need permission to read service accounts from the Kubernetes API.`,
+				Description: `Use annotations from the client token's
+associated service account as alias metadata for the Vault entity.
+Only annotations with the prefix "vault.hashicorp.com/alias-metadata-"
+will be used. Note that Vault will need permission to read service
+accounts from the Kubernetes API.`,
 				Default: false,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Use annotations of JWT service account as alias metadata",
@@ -140,7 +141,7 @@ func (b *kubeAuthBackend) pathConfigRead(ctx context.Context, req *logical.Reque
 				"disable_iss_validation":            config.DisableISSValidation,
 				"disable_local_ca_jwt":              config.DisableLocalCAJwt,
 				"token_reviewer_jwt_set":            config.TokenReviewerJWT != "",
-				"use_annotations_as_alias_metadata": b.useAnnotationsAsAliasMetadata,
+				"use_annotations_as_alias_metadata": config.UseAnnotationsAsAliasMetadata,
 			},
 		}
 
@@ -164,20 +165,22 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	issuer := data.Get("issuer").(string)
 	disableIssValidation := data.Get("disable_iss_validation").(bool)
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
+	useAnnotationsAsAliasMetadata := data.Get("use_annotations_as_alias_metadata").(bool)
 
 	if disableLocalJWT && caCert == "" {
 		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
 	}
 
 	config := &kubeConfig{
-		PublicKeys:           make([]crypto.PublicKey, len(pemList)),
-		PEMKeys:              pemList,
-		Host:                 host,
-		CACert:               caCert,
-		TokenReviewerJWT:     tokenReviewer,
-		Issuer:               issuer,
-		DisableISSValidation: disableIssValidation,
-		DisableLocalCAJwt:    disableLocalJWT,
+		PublicKeys:                    make([]crypto.PublicKey, len(pemList)),
+		PEMKeys:                       pemList,
+		Host:                          host,
+		CACert:                        caCert,
+		TokenReviewerJWT:              tokenReviewer,
+		Issuer:                        issuer,
+		DisableISSValidation:          disableIssValidation,
+		DisableLocalCAJwt:             disableLocalJWT,
+		UseAnnotationsAsAliasMetadata: useAnnotationsAsAliasMetadata,
 	}
 
 	var err error
@@ -201,7 +204,6 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		return nil, err
 	}
 
-	b.useAnnotationsAsAliasMetadata = data.Get("use_annotations_as_alias_metadata").(bool)
 	return nil, nil
 }
 
@@ -227,6 +229,12 @@ type kubeConfig struct {
 	// the local CA cert and service account jwt when running in a Kubernetes
 	// pod
 	DisableLocalCAJwt bool `json:"disable_local_ca_jwt"`
+	// UseAnnotationsAsAliasMetadata is an optional parameter to enable using
+	// annotations from the client token's associated service account as
+	// alias metadata for the Vault entity. Only annotations with the prefix
+	// "vault.hashicorp.com/alias-metadata-" will be used. Note that Vault will
+	// need permission to read service accounts from the Kubernetes API.
+	UseAnnotationsAsAliasMetadata bool `json:"use_annotations_as_alias_metadata"`
 }
 
 // PasrsePublicKeyPEM is used to parse RSA and ECDSA public keys from PEMs

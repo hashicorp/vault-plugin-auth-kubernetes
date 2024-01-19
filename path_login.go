@@ -166,7 +166,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	}
 
 	annotations := map[string]string{}
-	if b.useAnnotationsAsAliasMetadata {
+	if config.UseAnnotationsAsAliasMetadata {
 		annotations, err = b.serviceAccountGetterFactory(config).annotations(ctx, client, jwtStr, sa.namespace(), sa.name())
 		if err != nil {
 			return nil, err
