@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	metadataKeySaUid        = "service_account_uid"
-	metadataKeySaName       = "service_account_name"
-	metadataKeySaNamespace  = "service_account_namespace"
-	metadataKeySaSecretName = "service_account_secret_name"
+	metadataKeySAUID        = "service_account_uid"
+	metadataKeySAName       = "service_account_name"
+	metadataKeySANamespace  = "service_account_namespace"
+	metadataKeySASecretName = "service_account_secret_name"
 )
 
 var aliasMetadataDisallowedKeys = map[string]struct{}{
