@@ -90,10 +90,10 @@ then this plugin will use kubernetes.io/serviceaccount as the default issuer.
 			},
 			"use_annotations_as_alias_metadata": {
 				Type: framework.TypeBool,
-				Description: `Indicate annotations, with the "vault.hashicorp.com/alias-metadata-"
-prefix, of the request JWT service account will be added to the alias metadata.
-Note Vault client or the token reviewer service account needs to be configured
-with the permission to get service account annotations from Kubernetes API.`,
+				Description: `Use annotations from the client token's associated service account
+as alias metadata for the Vault entity. Only annotations with the prefix
+"vault.hashicorp.com/alias-metadata-" will be used. Note that Vault
+will need permission to read service accounts from the Kubernetes API.`,
 				Default: false,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Use annotations of JWT service account as alias metadata",
