@@ -86,6 +86,12 @@ type kubeAuthBackend struct {
 	// only be used in tests.
 	namespaceValidatorFactory namespaceValidatorFactory
 
+	// serviceAccountGetterFactory is used to configure the strategy for retrieving
+	// service account properties (currently metadata). Currently, the only options
+	// are using the kubernetes API or mocking the retrieval. Mocks should
+	// only be used in tests.
+	serviceAccountGetterFactory serviceAccountGetterFactory
+
 	// localSATokenReader caches the service account token in memory.
 	// It periodically reloads the token to support token rotation/renewal.
 	// Local token is used when running in a pod with following configuration
@@ -139,8 +145,9 @@ func Backend() *kubeAuthBackend {
 		// Set the default TLSConfig
 		tlsConfig: getDefaultTLSConfig(),
 		// Set the review factory to default to calling into the kubernetes API.
-		reviewFactory:             tokenReviewAPIFactory,
-		namespaceValidatorFactory: newNsValidatorWrapper,
+		reviewFactory:               tokenReviewAPIFactory,
+		namespaceValidatorFactory:   newNsValidatorWrapper,
+		serviceAccountGetterFactory: newServiceAccountGetterWrapper,
 	}
 
 	b.Backend = &framework.Backend{

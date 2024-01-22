@@ -47,10 +47,10 @@ var (
 	testNamespace                    = "default"
 	testName                         = "vault-auth"
 	testUID                          = "d77f89bc-9055-11e7-a068-0800276d99bf"
+	testMetadataAnnotations          = map[string]string{"baz": "qux", "foo": "bar"}
 	testMockTokenReviewFactory       = mockTokenReviewFactory(testName, testNamespace, testUID)
 	testMockNamespaceValidateFactory = mockNamespaceValidateFactory(
 		map[string]string{"key": "value", "other": "label"})
-
 	testGlobbedNamespace = "def*"
 	testGlobbedName      = "vault-*"
 
@@ -225,11 +225,12 @@ func jwtSign(header string, payload string, privateKey *ecdsa.PrivateKey) string
 }
 
 type testBackendConfig struct {
-	pems                []string
-	saName              string
-	saNamespace         string
-	saNamespaceSelector string
-	aliasNameSource     string
+	pems                          []string
+	saName                        string
+	saNamespace                   string
+	saNamespaceSelector           string
+	aliasNameSource               string
+	useAnnotationsAsAliasMetadata bool
 }
 
 func defaultTestBackendConfig() *testBackendConfig {
@@ -247,9 +248,10 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 
 	// test no certificate
 	data := map[string]interface{}{
-		"pem_keys":           config.pems,
-		"kubernetes_host":    "host",
-		"kubernetes_ca_cert": testCACert,
+		"pem_keys":                          config.pems,
+		"kubernetes_host":                   "host",
+		"kubernetes_ca_cert":                testCACert,
+		"use_annotations_as_alias_metadata": config.useAnnotationsAsAliasMetadata,
 	}
 
 	req := &logical.Request{
@@ -290,6 +292,13 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 
 	b.(*kubeAuthBackend).reviewFactory = testMockTokenReviewFactory
 	b.(*kubeAuthBackend).namespaceValidatorFactory = testMockNamespaceValidateFactory
+
+	sa := v1.ObjectMeta{Annotations: map[string]string{}}
+	for k, v := range testMetadataAnnotations {
+		sa.Annotations[fmt.Sprintf("%s%s", annotationKeyPrefix, k)] = v
+	}
+	b.(*kubeAuthBackend).serviceAccountGetterFactory = mockServiceAccountGetterFactory(sa)
+
 	return b, storage
 }
 
@@ -836,6 +845,45 @@ func TestLoginSvcAcctNamespaceSelector(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLoginEntityAliasMetadataAssignment(t *testing.T) {
+	config := defaultTestBackendConfig()
+	config.useAnnotationsAsAliasMetadata = true
+
+	b, storage := setupBackend(t, config)
+
+	data := map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  jwtGoodDataToken,
+	}
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+		Connection: &logical.Connection{
+			RemoteAddr: "127.0.0.1",
+		},
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	for expK, expV := range testMetadataAnnotations {
+		v, ok := resp.Auth.Alias.Metadata[expK]
+
+		if !ok {
+			t.Fatalf("expected key %q not found", expK)
+		}
+
+		if v != expV {
+			t.Fatalf("expected value %q got %q for key %q", expV, v, expK)
+		}
 	}
 }
 

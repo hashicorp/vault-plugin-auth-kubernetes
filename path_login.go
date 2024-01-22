@@ -20,6 +20,20 @@ import (
 	josejwt "gopkg.in/square/go-jose.v2/jwt"
 )
 
+const (
+	metadataKeySAUID        = "service_account_uid"
+	metadataKeySAName       = "service_account_name"
+	metadataKeySANamespace  = "service_account_namespace"
+	metadataKeySASecretName = "service_account_secret_name"
+)
+
+var reservedAliasMetadataKeys = map[string]struct{}{
+	metadataKeySAUID:        {},
+	metadataKeySAName:       {},
+	metadataKeySANamespace:  {},
+	metadataKeySASecretName: {},
+}
+
 // defaultJWTIssuer is used to verify the iss header on the JWT if the config doesn't specify an issuer.
 var defaultJWTIssuer = "kubernetes/serviceaccount"
 
@@ -130,7 +144,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrUnrecoverable
 	}
 
-	serviceAccount, err := b.parseAndValidateJWT(ctx, client, jwtStr, role, config)
+	sa, err := b.parseAndValidateJWT(ctx, client, jwtStr, role, config)
 	if err != nil {
 		if err == jose.ErrCryptoFailure || strings.Contains(err.Error(), "verifying token signature") {
 			b.Logger().Debug(`login unauthorized`, "err", err)
@@ -139,44 +153,57 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, err
 	}
 
-	aliasName, err := b.getAliasName(role, serviceAccount)
+	aliasName, err := b.getAliasName(role, sa)
 	if err != nil {
 		return nil, err
 	}
 
 	// look up the JWT token in the kubernetes API
-	err = serviceAccount.lookup(ctx, client, jwtStr, role.Audience, b.reviewFactory(config))
-
+	err = sa.lookup(ctx, client, jwtStr, role.Audience, b.reviewFactory(config))
 	if err != nil {
 		b.Logger().Debug(`login unauthorized`, "err", err)
 		return nil, logical.ErrPermissionDenied
 	}
 
-	uid, err := serviceAccount.uid()
+	annotations := map[string]string{}
+	if config.UseAnnotationsAsAliasMetadata {
+		annotations, err = b.serviceAccountGetterFactory(config).annotations(ctx, client, jwtStr, sa.namespace(), sa.name())
+		if err != nil {
+			if errors.Is(err, errAliasMetadataReservedKeysFound) {
+				return logical.ErrorResponse(err.Error()), nil
+			}
+
+			return nil, err
+		}
+	}
+
+	uid, err := sa.uid()
 	if err != nil {
 		return nil, err
 	}
+
+	metadata := annotations
+	metadata[metadataKeySAUID] = uid
+	metadata[metadataKeySAName] = sa.name()
+	metadata[metadataKeySANamespace] = sa.namespace()
+	metadata[metadataKeySASecretName] = sa.SecretName
+
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
-			Name: aliasName,
-			Metadata: map[string]string{
-				"service_account_uid":         uid,
-				"service_account_name":        serviceAccount.name(),
-				"service_account_namespace":   serviceAccount.namespace(),
-				"service_account_secret_name": serviceAccount.SecretName,
-			},
+			Name:     aliasName,
+			Metadata: metadata,
 		},
 		InternalData: map[string]interface{}{
 			"role": roleName,
 		},
 		Metadata: map[string]string{
-			"service_account_uid":         uid,
-			"service_account_name":        serviceAccount.name(),
-			"service_account_namespace":   serviceAccount.namespace(),
-			"service_account_secret_name": serviceAccount.SecretName,
-			"role":                        roleName,
+			metadataKeySAUID:        uid,
+			metadataKeySAName:       sa.name(),
+			metadataKeySANamespace:  sa.namespace(),
+			metadataKeySASecretName: sa.SecretName,
+			"role":                  roleName,
 		},
-		DisplayName: fmt.Sprintf("%s-%s", serviceAccount.namespace(), serviceAccount.name()),
+		DisplayName: fmt.Sprintf("%s-%s", sa.namespace(), sa.name()),
 	}
 
 	role.PopulateTokenAuth(auth)
@@ -289,7 +316,8 @@ func (keySet DontVerifySignature) VerifySignature(_ context.Context, token strin
 
 // parseAndValidateJWT is used to parse, validate and lookup the JWT token.
 func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.Client, jwtStr string,
-	role *roleStorageEntry, config *kubeConfig) (*serviceAccount, error) {
+	role *roleStorageEntry, config *kubeConfig,
+) (*serviceAccount, error) {
 	expected := capjwt.Expected{
 		SigningAlgorithms: supportedJwtAlgs,
 	}
