@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/vault-plugin-auth-kubernetes/integrationtest/k8s"
@@ -285,7 +286,7 @@ func TestFailWithBadTokenReviewerJwt(t *testing.T) {
 	}
 }
 
-func TestAuthAliasMetadataAssignment(t *testing.T) {
+func TestSuccessWithAuthAliasMetadataAssignment(t *testing.T) {
 	// annotate the service account
 	expMetadata := map[string]string{
 		"key-1": "foo",
@@ -362,6 +363,53 @@ path "%s/{{identity.entity.aliases.%s.metadata.key-1}}" {
 		})
 	if err != nil {
 		t.Fatalf("Expected successful KVV1 PUT but got: %v", err)
+	}
+}
+
+func TestFailWithAuthAliasMetadataAssignmentOnReservedKeys(t *testing.T) {
+	// annotate the service account with disallowed keys
+	expMetadata := map[string]string{
+		"service_account_secret_name": "foo",
+		"other-key":                   "bar",
+	}
+
+	const annotationPrefix = "vault.hashicorp.com/alias-metadata-"
+	annotations := map[string]string{}
+	for k, v := range expMetadata {
+		annotations[annotationPrefix+k] = v
+	}
+	annotateServiceAccount(t, "vault", annotations)
+
+	client := setupKubernetesAuth(t, map[string]interface{}{
+		"kubernetes_host":                   "https://kubernetes.default.svc.cluster.local",
+		"use_annotations_as_alias_metadata": true,
+	})
+
+	// config kubernetes auth role and login
+	setupKubernetesAuthRole(t, client, "vault", nil)
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+		"role": "test-role",
+		"jwt":  createToken(t, "vault", nil),
+	})
+
+	if err == nil {
+		t.Fatalf("Expected failed login but got nil err")
+	}
+
+	respErr, ok := err.(*api.ResponseError)
+	if !ok {
+		t.Fatalf("Expected api.ResponseError but was: %T", err)
+	}
+	if respErr.StatusCode != http.StatusBadRequest {
+		t.Fatalf("Expected 400 but was %d: %s", respErr.StatusCode, respErr.Error())
+	}
+
+	errMsgAliasMetadataReservedKeysFound := "entity alias metadata keys for only internal use found from the client" +
+		" token's associated service account annotations"
+	if !strings.Contains(respErr.Error(), errMsgAliasMetadataReservedKeysFound) {
+		t.Fatalf("Expected failed err to contain %s but got err %s", errMsgAliasMetadataReservedKeysFound,
+			respErr.Error())
 	}
 }
 

@@ -3,6 +3,7 @@ package kubeauth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,9 @@ import (
 )
 
 const annotationKeyPrefix = "vault.hashicorp.com/alias-metadata-"
+
+var errAliasMetadataReservedKeysFound = errors.New("entity alias metadata keys for only internal use found" +
+	" from the client token's associated service account annotations")
 
 // serviceAccountGetter defines a namespace validator interface
 type serviceAccountGetter interface {
@@ -75,18 +79,26 @@ func (w *serviceAccountGetterWrapper) annotations(ctx context.Context, client *h
 		return nil, err
 	}
 
+	var found bool
+	var foundKeys []string
 	annotations := map[string]string{}
 	for k, v := range sa.Annotations {
 		if strings.HasPrefix(k, annotationKeyPrefix) {
 			newK := strings.TrimPrefix(k, annotationKeyPrefix)
-
-			if _, ok := aliasMetadataDisallowedKeys[newK]; ok {
-				return nil, fmt.Errorf("key %q is reserved for internal use", newK)
+			if _, ok := reservedAliasMetadataKeys[newK]; ok {
+				foundKeys = append(foundKeys, newK)
+				found = true
+			} else {
+				annotations[newK] = v
 			}
-
-			annotations[newK] = v
 		}
 	}
+
+	if found {
+		errContext := fmt.Sprintf("keys=%+q", foundKeys)
+		return nil, fmt.Errorf("%w: %s", errAliasMetadataReservedKeysFound, errContext)
+	}
+
 	return annotations, nil
 }
 

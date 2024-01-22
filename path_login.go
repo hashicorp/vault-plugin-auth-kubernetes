@@ -27,11 +27,11 @@ const (
 	metadataKeySASecretName = "service_account_secret_name"
 )
 
-var aliasMetadataDisallowedKeys = map[string]struct{}{
-	metadataKeySaUid:        {},
-	metadataKeySaName:       {},
-	metadataKeySaNamespace:  {},
-	metadataKeySaSecretName: {},
+var reservedAliasMetadataKeys = map[string]struct{}{
+	metadataKeySAUID:        {},
+	metadataKeySAName:       {},
+	metadataKeySANamespace:  {},
+	metadataKeySASecretName: {},
 }
 
 // defaultJWTIssuer is used to verify the iss header on the JWT if the config doesn't specify an issuer.
@@ -169,6 +169,10 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	if config.UseAnnotationsAsAliasMetadata {
 		annotations, err = b.serviceAccountGetterFactory(config).annotations(ctx, client, jwtStr, sa.namespace(), sa.name())
 		if err != nil {
+			if errors.Is(err, errAliasMetadataReservedKeysFound) {
+				return logical.ErrorResponse(err.Error()), nil
+			}
+
 			return nil, err
 		}
 	}
@@ -179,10 +183,10 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	}
 
 	metadata := annotations
-	metadata[metadataKeySaUid] = uid
-	metadata[metadataKeySaName] = sa.name()
-	metadata[metadataKeySaNamespace] = sa.namespace()
-	metadata[metadataKeySaSecretName] = sa.SecretName
+	metadata[metadataKeySAUID] = uid
+	metadata[metadataKeySAName] = sa.name()
+	metadata[metadataKeySANamespace] = sa.namespace()
+	metadata[metadataKeySASecretName] = sa.SecretName
 
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
@@ -193,10 +197,10 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 			"role": roleName,
 		},
 		Metadata: map[string]string{
-			metadataKeySaUid:        uid,
-			metadataKeySaName:       sa.name(),
-			metadataKeySaNamespace:  sa.namespace(),
-			metadataKeySaSecretName: sa.SecretName,
+			metadataKeySAUID:        uid,
+			metadataKeySAName:       sa.name(),
+			metadataKeySANamespace:  sa.namespace(),
+			metadataKeySASecretName: sa.SecretName,
 			"role":                  roleName,
 		},
 		DisplayName: fmt.Sprintf("%s-%s", sa.namespace(), sa.name()),
