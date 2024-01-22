@@ -328,7 +328,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 		if config.Issuer != "" {
 			expected.Issuer = config.Issuer
 		} else {
-			config.Issuer = defaultJWTIssuer
+			expected.Issuer = defaultJWTIssuer
 		}
 	}
 
