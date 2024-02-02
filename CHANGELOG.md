@@ -14,7 +14,7 @@
 
 ### Features
 * Use annotations with the prefix `vault.hashicorp.com/alias-metadata-` from the client token's associated
-  service account as alias metadata for the Vault entity [GH-226](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/226)
+service account as alias metadata for the Vault entity [GH-226](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/226)
 
 ### Changes
 
