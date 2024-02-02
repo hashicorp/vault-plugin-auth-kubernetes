@@ -1,29 +1,39 @@
 ## 0.18.0 (Feb 2, 2024)
 
+### Changes
+
+* Updated dependencies [GH-230](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/230)
+  * `github.com/hashicorp/vault/api` v1.10.0 -> v1.11.0
+  * `k8s.io/api v0.29.0` -> v0.29.1
+  * `k8s.io/apimachinery` v0.29.0 -> v0.29.1
+  * `golang.org/x/net` v0.17.0 -> v0.19.0
+  * `golang.org/x/mod` v0.12.0 -> v0.14.0
+  * `golang.org/x/tools` v0.12.0 -> v0.16.1
+
+## Unreleased
+
 ### Features
 * Use annotations with the prefix `vault.hashicorp.com/alias-metadata-` from the client token's associated
-service account as alias metadata for the Vault entity [GH-226](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/226)
+  service account as alias metadata for the Vault entity [GH-226](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/226)
 
 ### Changes
 
 * Build with go 1.21.3
 * Test with k8s versions 1.24-1.28
-* Updated dependencies [GH-209](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/209) [GH-225](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/225) [GH-230](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/230):
+* Updated dependencies [GH-209](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/209) [GH-225](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/225):
   * `github.com/hashicorp/cap` v0.3.4 -> v0.4.1
   * `github.com/hashicorp/go-sockaddr` v1.0.2 -> v1.0.5
-  * `github.com/hashicorp/vault/api` v1.9.2 -> v1.11.0
+  * `github.com/hashicorp/vault/api` v1.9.2 -> v1.10.0
   * `github.com/hashicorp/vault/sdk` v0.9.2 -> v0.10.2
-  * `k8s.io/api` v0.28.1 -> v0.29.1
-  * `k8s.io/apimachinery` v0.28.1 -> v0.29.1
+  * `k8s.io/api` v0.28.1 -> v0.29.0
+  * `k8s.io/apimachinery` v0.28.1 -> v0.29.0
   * `golang.org/x/crypto` v0.11.0 -> v0.14.0
-  * `golang.org/x/net` v0.13.0 -> v0.19.0
+  * `golang.org/x/net` v0.13.0 -> v0.17.0
   * `golang.org/x/sys` v0.10.0 -> v0.13.0
   * `golang.org/x/text` v0.11.0 -> v0.13.0
   * `github.com/docker/docker` v24.0.5+incompatible -> v24.0.7+incompatible
   * `github.com/go-jose/go-jose/v3` v3.0.0 -> v3.0.1
   * `github.com/hashicorp/go-hclog` v1.5.0 -> v1.6.2
-  * `golang.org/x/mod` v0.12.0 -> v0.14.0
-  * `golang.org/x/tools` v0.12.0 -> v0.16.1
 
 ### Improvements
 
