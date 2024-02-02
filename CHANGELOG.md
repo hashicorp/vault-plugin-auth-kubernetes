@@ -1,3 +1,15 @@
+## 0.18.0 (Feb 2, 2024)
+
+### Changes
+
+* Updated dependencies [GH-230](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/230)
+  * `github.com/hashicorp/vault/api` v1.10.0 -> v1.11.0
+  * `k8s.io/api v0.29.0` -> v0.29.1
+  * `k8s.io/apimachinery` v0.29.0 -> v0.29.1
+  * `golang.org/x/net` v0.17.0 -> v0.19.0
+  * `golang.org/x/mod` v0.12.0 -> v0.14.0
+  * `golang.org/x/tools` v0.12.0 -> v0.16.1
+
 ## Unreleased
 
 ### Features
