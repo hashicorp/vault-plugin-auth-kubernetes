@@ -458,7 +458,7 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				DisableLocalCAJwt:    false,
 			},
 		},
-		"CA and disable local default": {
+		"disable local default, CA set": {
 			config: map[string]interface{}{
 				"kubernetes_host":      "host",
 				"kubernetes_ca_cert":   testCACert,
@@ -469,6 +469,22 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				PEMKeys:              []string{},
 				Host:                 "host",
 				CACert:               testCACert,
+				TokenReviewerJWT:     "",
+				DisableISSValidation: true,
+				DisableLocalCAJwt:    true,
+			},
+		},
+		"disable local default, no CA or JWT, default to local CA": {
+			config: map[string]interface{}{
+				"kubernetes_host":      "host",
+				"disable_local_ca_jwt": true,
+			},
+			setupInClusterFiles: true,
+			expected: &kubeConfig{
+				PublicKeys:           []crypto.PublicKey{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               testLocalCACert,
 				TokenReviewerJWT:     "",
 				DisableISSValidation: true,
 				DisableLocalCAJwt:    true,

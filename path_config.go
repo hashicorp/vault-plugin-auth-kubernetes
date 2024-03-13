@@ -34,10 +34,10 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 				Type:        framework.TypeString,
 				Description: "Host must be a host string, a host:port pair, or a URL to the base of the Kubernetes API server.",
 			},
-
 			"kubernetes_ca_cert": {
-				Type:        framework.TypeString,
-				Description: "PEM encoded CA cert for use by the TLS client used to talk with the API.",
+				Type: framework.TypeString,
+				Description: `Optional PEM encoded CA cert for use by the TLS client used to talk with the API. 
+If not set, the local CA cert will be used.`,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Kubernetes CA Certificate",
 				},
@@ -166,10 +166,6 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	disableIssValidation := data.Get("disable_iss_validation").(bool)
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
 	useAnnotationsAsAliasMetadata := data.Get("use_annotations_as_alias_metadata").(bool)
-
-	if disableLocalJWT && caCert == "" {
-		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
-	}
 
 	config := &kubeConfig{
 		PublicKeys:                    make([]crypto.PublicKey, len(pemList)),
