@@ -10,6 +10,10 @@
   * `k8s.io/api` v0.29.1 -> v0.29.2
   * `k8s.io/apimachinery` v0.29.1 -> v0.29.2
 
+### Improvements
+
+* Make kubernetes_ca_cert optional [GH-238](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/238)
+
 ## 0.18.0 (Feb 2, 2024)
 
 ### Changes
