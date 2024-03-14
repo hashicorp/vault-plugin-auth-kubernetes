@@ -102,6 +102,7 @@ type kubeAuthBackend struct {
 	// localCACertReader contains the local CA certificate. Local CA certificate is
 	// used when running in a pod with following configuration
 	// - kubernetes_ca_cert is not set
+	// - disable_local_ca_jwt is false
 	localCACertReader *cachingFileReader
 
 	// tlsConfigUpdaterRunning is used to signal the current state of the tlsConfig updater routine.
@@ -333,16 +334,6 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 	if config == nil {
 		return config, nil
 	}
-
-	// Read local CA cert unless it was stored in config.
-	// Else build the TLSConfig with the trusted CA cert and load into client
-	if config.CACert == "" {
-		config.CACert, err = b.localCACertReader.ReadFile()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// Nothing more to do if loading local CA cert and JWT token is disabled.
 	if config.DisableLocalCAJwt {
 		return config, nil
@@ -357,6 +348,16 @@ func (b *kubeAuthBackend) loadConfig(ctx context.Context, s logical.Storage) (*k
 			b.Logger().Debug("failed to read local service account token, will use client token", "error", err)
 		}
 	}
+
+	// Read local CA cert unless it was stored in config.
+	// Else build the TLSConfig with the trusted CA cert and load into client
+	if config.CACert == "" {
+		config.CACert, err = b.localCACertReader.ReadFile()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return config, nil
 }
 
@@ -424,7 +425,7 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	var caCertBytes []byte
 	if config.CACert != "" {
 		caCertBytes = []byte(config.CACert)
-	} else if b.localCACertReader != nil {
+	} else if !config.DisableLocalCAJwt && b.localCACertReader != nil {
 		data, err := b.localCACertReader.ReadFile()
 		if err != nil {
 			return err
@@ -439,7 +440,7 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 		}
 	} else {
 		// provide an empty certPool
-		b.Logger().Warn("No CA certificates configured, TLS verification will fail")
+		b.Logger().Warn("No CA certificates configured, TLS verification will use the system's trust store")
 		// TODO: think about supporting host root CA certificates via a configuration toggle,
 		// in which case RootCAs should be set to nil
 	}

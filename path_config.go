@@ -37,7 +37,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 			"kubernetes_ca_cert": {
 				Type: framework.TypeString,
 				Description: `Optional PEM encoded CA cert for use by the TLS client used to talk with the API. 
-If not set, the local CA cert will be used.`,
+If it is not set and disable_local_ca_jwt is true, the system's trust store will be used.`,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Kubernetes CA Certificate",
 				},
@@ -159,7 +159,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		return logical.ErrorResponse("no host provided"), nil
 	}
 
-	disableLocalJWT := data.Get("disable_local_ca_jwt").(bool)
+	disableLocalCAJwt := data.Get("disable_local_ca_jwt").(bool)
 	pemList := data.Get("pem_keys").([]string)
 	caCert := data.Get("kubernetes_ca_cert").(string)
 	issuer := data.Get("issuer").(string)
@@ -175,7 +175,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		TokenReviewerJWT:              tokenReviewer,
 		Issuer:                        issuer,
 		DisableISSValidation:          disableIssValidation,
-		DisableLocalCAJwt:             disableLocalJWT,
+		DisableLocalCAJwt:             disableLocalCAJwt,
 		UseAnnotationsAsAliasMetadata: useAnnotationsAsAliasMetadata,
 	}
 
