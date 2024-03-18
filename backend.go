@@ -440,7 +440,7 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 			// should never happen
 			return fmt.Errorf("type assertion failed for %T", b.httpClient.Transport)
 		}
-		transport.TLSClientConfig = b.tlsConfig
+		transport.TLSClientConfig = getDefaultTLSConfig()
 		return nil
 	}
 
