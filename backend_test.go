@@ -173,6 +173,23 @@ func Test_kubeAuthBackend_updateTLSConfig(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:       "ca-certs-not-set",
+			httpClient: getDefaultHTTPClient(),
+			tlsConfig:  getDefaultTLSConfig(),
+			configs: []testConfig{
+				{
+					config: &kubeConfig{
+						DisableLocalCAJwt: true,
+					},
+					expectTLSConfig: &tls.Config{
+						MinVersion: minTLSVersion,
+						RootCAs:    nil,
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
