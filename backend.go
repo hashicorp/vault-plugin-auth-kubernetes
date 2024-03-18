@@ -421,28 +421,27 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 		return err
 	}
 
-	// attempt to read the CA certificates from the config directly or from the filesystem.
-	var caCertBytes []byte
-	if config.CACert != "" {
-		caCertBytes = []byte(config.CACert)
-	} else if !config.DisableLocalCAJwt && b.localCACertReader != nil {
-		data, err := b.localCACertReader.ReadFile()
-		if err != nil {
-			return err
+	var certPool *x509.CertPool
+	if config.CACert == "" && config.DisableLocalCAJwt {
+		b.Logger().Warn("No CA certificates configured and defaulting to using the local CA cert disabled, " +
+			"TLS verification will use the system's trust store")
+	} else {
+		// attempt to read the CA certificates from the config directly or from the filesystem.
+		var caCertBytes []byte
+		if config.CACert != "" {
+			caCertBytes = []byte(config.CACert)
+		} else if b.localCACertReader != nil {
+			data, err := b.localCACertReader.ReadFile()
+			if err != nil {
+				return err
+			}
+			caCertBytes = []byte(data)
 		}
-		caCertBytes = []byte(data)
-	}
 
-	certPool := x509.NewCertPool()
-	if len(caCertBytes) > 0 {
+		certPool = x509.NewCertPool()
 		if ok := certPool.AppendCertsFromPEM(caCertBytes); !ok {
 			b.Logger().Warn("Configured CA PEM data contains no valid certificates, TLS verification will fail")
 		}
-	} else {
-		// provide an empty certPool
-		b.Logger().Warn("No CA certificates configured, TLS verification will use the system's trust store")
-		// TODO: think about supporting host root CA certificates via a configuration toggle,
-		// in which case RootCAs should be set to nil
 	}
 
 	// only refresh the Root CAs if they have changed since the last full update.
