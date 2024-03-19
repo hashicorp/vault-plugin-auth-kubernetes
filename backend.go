@@ -445,12 +445,12 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	var certPool *x509.CertPool
 	if len(caCertBytes) == 0 {
 		// since the CA chain is not configured, we use the system's cert pool.
-		sysRootPool, err := x509.SystemCertPool()
+		sysCertPool, err := x509.SystemCertPool()
 		if err != nil {
 			return err
 		}
 
-		certPool = sysRootPool
+		certPool = sysCertPool
 	} else {
 		// since we have a CA chain configured, we create a new x509.CertPool with its
 		// contents.

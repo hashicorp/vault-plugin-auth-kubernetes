@@ -167,12 +167,12 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
 	useAnnotationsAsAliasMetadata := data.Get("use_annotations_as_alias_metadata").(bool)
 
-	// validCACert returns true if caCert contains at least one valid certificate. It
+	// hasCerts returns true if caCert contains at least one valid certificate. It
 	// does not check if any of the certificates from caCert are CAs, although that
 	// might be something that we want in the future.
-	validCACert := func() bool {
+	hasCerts := func(certBundle string) bool {
 		var b *pem.Block
-		rest := []byte(caCert)
+		rest := []byte(certBundle)
 		for {
 			b, rest = pem.Decode(rest)
 			if b == nil {
@@ -188,7 +188,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	}
 
 	if caCert != "" {
-		if !validCACert() {
+		if !hasCerts(caCert) {
 			return logical.ErrorResponse(
 				"Configured CA PEM data contains no valid certificates, TLS verification will fail",
 			), nil
