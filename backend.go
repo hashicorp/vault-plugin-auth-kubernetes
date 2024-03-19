@@ -434,13 +434,17 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	}
 
 	if len(caCertBytes) == 0 {
-		b.Logger().Warn("No CA certificates configured, TLS verification will use the system's trust store")
+		// no CA certificates configured, TLS verification will use the system's trust store
 		transport, ok := b.httpClient.Transport.(*http.Transport)
 		if !ok {
 			// should never happen
 			return fmt.Errorf("type assertion failed for %T", b.httpClient.Transport)
 		}
-		transport.TLSClientConfig = getDefaultTLSConfig()
+		if transport.TLSClientConfig == nil || transport.TLSClientConfig.RootCAs != nil {
+			b.Logger().Trace("Root CA certificate pool has become nil, updating the client's transport")
+			b.tlsConfig.RootCAs = nil
+			transport.TLSClientConfig = getDefaultTLSConfig()
+		}
 		return nil
 	}
 
