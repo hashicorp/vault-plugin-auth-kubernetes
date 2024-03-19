@@ -3,4 +3,4 @@ bin/*
 .idea/*
 vault-plugin-auth-kubernetes
 go.work
-go.work.sum
+scratch/
