@@ -445,12 +445,11 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 	var certPool *x509.CertPool
 	if len(caCertBytes) == 0 {
 		// since the CA chain is not configured, we use the system's cert pool.
-		sysCertPool, err := x509.SystemCertPool()
+		var err error
+		certPool, err = x509.SystemCertPool()
 		if err != nil {
 			return err
 		}
-
-		certPool = sysCertPool
 	} else {
 		// since we have a CA chain configured, we create a new x509.CertPool with its
 		// contents.
@@ -460,9 +459,7 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 		}
 	}
 
-	// only refresh the Root CAs if they have changed since the last full update.
-	if b.tlsConfig.RootCAs == nil || !b.tlsConfig.RootCAs.Equal(certPool) {
-		b.Logger().Trace("Root CA certificate pool has changed, updating the client's transport")
+	setTLSClientConfig := func() error {
 		transport, ok := b.httpClient.Transport.(*http.Transport)
 		if !ok {
 			// should never happen
@@ -471,6 +468,15 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 
 		b.tlsConfig.RootCAs = certPool
 		transport.TLSClientConfig = b.tlsConfig
+		return nil
+	}
+
+	// only refresh the Root CAs if they have changed since the last full update.
+	if b.tlsConfig.RootCAs == nil {
+		return setTLSClientConfig()
+	} else if !b.tlsConfig.RootCAs.Equal(certPool) {
+		b.Logger().Trace("Root CA certificate pool has changed, updating the client's transport")
+		return setTLSClientConfig()
 	} else {
 		b.Logger().Trace("Root CA certificate pool is unchanged, no update required")
 	}
