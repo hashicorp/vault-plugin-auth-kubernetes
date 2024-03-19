@@ -128,7 +128,16 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 	return b, nil
 }
 
-var getDefaultHTTPClient = cleanhttp.DefaultPooledClient
+// getDefaultTLSConfig returns a http.Client with the supported, default
+// tls.Config from getDefaultTLSConfig() set on the
+// cleanhttp.DefaultPooledTransport() http.Transport.
+func getDefaultHTTPClient() *http.Client {
+	transport := cleanhttp.DefaultPooledTransport()
+	transport.TLSClientConfig = getDefaultTLSConfig()
+	return &http.Client{
+		Transport: transport,
+	}
+}
 
 func getDefaultTLSConfig() *tls.Config {
 	return &tls.Config{
@@ -433,28 +442,26 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 		caCertBytes = []byte(data)
 	}
 
+	var certPool *x509.CertPool
 	if len(caCertBytes) == 0 {
-		// no CA certificates configured, TLS verification will use the system's trust store
-		transport, ok := b.httpClient.Transport.(*http.Transport)
-		if !ok {
-			// should never happen
-			return fmt.Errorf("type assertion failed for %T", b.httpClient.Transport)
+		// since the CA chain is not configured, we use the system's cert pool.
+		sysRootPool, err := x509.SystemCertPool()
+		if err != nil {
+			return err
 		}
-		if transport.TLSClientConfig == nil || transport.TLSClientConfig.RootCAs != nil {
-			b.Logger().Trace("Root CA certificate pool has become nil, updating the client's transport")
-			b.tlsConfig.RootCAs = nil
-			transport.TLSClientConfig = getDefaultTLSConfig()
-		}
-		return nil
-	}
 
-	certPool := x509.NewCertPool()
-	if ok := certPool.AppendCertsFromPEM(caCertBytes); !ok {
-		b.Logger().Warn("Configured CA PEM data contains no valid certificates, TLS verification will fail")
+		certPool = sysRootPool
+	} else {
+		// since we have a CA chain configured, we create a new x509.CertPool with its
+		// contents.
+		certPool = x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM(caCertBytes); !ok {
+			b.Logger().Warn("Configured CA PEM data contains no valid certificates, TLS verification will fail")
+		}
 	}
 
 	// only refresh the Root CAs if they have changed since the last full update.
-	if !b.tlsConfig.RootCAs.Equal(certPool) {
+	if b.tlsConfig.RootCAs == nil || !b.tlsConfig.RootCAs.Equal(certPool) {
 		b.Logger().Trace("Root CA certificate pool has changed, updating the client's transport")
 		transport, ok := b.httpClient.Transport.(*http.Transport)
 		if !ok {
