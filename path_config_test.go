@@ -174,7 +174,7 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
-	// test invalid cert
+	// test invalid PEM keys
 	data = map[string]interface{}{
 		"pem_keys":        "bad",
 		"kubernetes_host": "host",
@@ -192,6 +192,27 @@ func TestConfig(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if resp.Error().Error() != "data does not contain any valid RSA or ECDSA public keys" {
+		t.Fatalf("got unexpected error: %v", resp.Error())
+	}
+
+	// test invalid CA cert
+	data = map[string]interface{}{
+		"kubernetes_ca_cert": "bad",
+		"kubernetes_host":    "host",
+	}
+
+	req = &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      configPath,
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if resp == nil || !resp.IsError() {
+		t.Fatal("expected error")
+	}
+	if resp.Error().Error() != "Configured CA PEM data contains no valid certificates, TLS verification will fail" {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
