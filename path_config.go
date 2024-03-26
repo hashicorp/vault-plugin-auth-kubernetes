@@ -37,7 +37,7 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 			"kubernetes_ca_cert": {
 				Type: framework.TypeString,
 				Description: `Optional PEM encoded CA cert for use by the TLS client used to talk with the API. 
-If it is not set and disable_local_ca_jwt is true, the system's trust store will be used.`,
+If it is not set and disable_local_ca_jwt is true, the system's trusted CA certificate pool will be used.`,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Kubernetes CA Certificate",
 				},
