@@ -195,9 +195,9 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
-	// test invalid CA cert
+	// test invalid kubernetes_ca_cert
 	data = map[string]interface{}{
-		"kubernetes_ca_cert": "bad",
+		"kubernetes_ca_cert": testInvalidCACert,
 		"kubernetes_host":    "host",
 	}
 
@@ -212,7 +212,7 @@ func TestConfig(t *testing.T) {
 	if resp == nil || !resp.IsError() {
 		t.Fatal("expected error")
 	}
-	if resp.Error().Error() != "Configured CA PEM data contains no valid certificates, TLS verification will fail" {
+	if resp.Error().Error() != "The provided CA PEM data contains no valid certificates" {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
