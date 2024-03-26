@@ -174,7 +174,7 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
-	// test invalid PEM keys
+	// test invalid pem_keys
 	data = map[string]interface{}{
 		"pem_keys":        "bad",
 		"kubernetes_host": "host",
