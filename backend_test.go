@@ -25,6 +25,11 @@ func Test_kubeAuthBackend_updateTLSConfig(t *testing.T) {
 	localCertPool := getTestCertPool(t, testLocalCACert)
 	otherCertPool := getTestCertPool(t, testOtherCACert)
 
+	systemCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type testConfig struct {
 		config          *kubeConfig
 		expectTLSConfig *tls.Config
@@ -169,6 +174,23 @@ func Test_kubeAuthBackend_updateTLSConfig(t *testing.T) {
 						RootCAs:    defaultCertPool,
 					},
 					localCACert: testCACert,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:       "ca-certs-not-set",
+			httpClient: getDefaultHTTPClient(),
+			tlsConfig:  getDefaultTLSConfig(),
+			configs: []testConfig{
+				{
+					config: &kubeConfig{
+						DisableLocalCAJwt: true,
+					},
+					expectTLSConfig: &tls.Config{
+						MinVersion: minTLSVersion,
+						RootCAs:    systemCertPool,
+					},
 				},
 			},
 			wantErr: false,

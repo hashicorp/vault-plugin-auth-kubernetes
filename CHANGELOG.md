@@ -10,6 +10,12 @@
   * `k8s.io/api` v0.29.1 -> v0.29.2
   * `k8s.io/apimachinery` v0.29.1 -> v0.29.2
 
+### Improvements
+
+* Allow TLS client to use the host's root CA set when no CA certificates are provided and
+`disable_local_ca_jwt` is true if running Vault in a Kubernetes pod. Additionally, validate the
+configuration's provided CA PEM bundle. [GH-238](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/238)
+
 ## 0.18.0 (Feb 2, 2024)
 
 ### Changes

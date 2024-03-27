@@ -34,10 +34,10 @@ func pathConfig(b *kubeAuthBackend) *framework.Path {
 				Type:        framework.TypeString,
 				Description: "Host must be a host string, a host:port pair, or a URL to the base of the Kubernetes API server.",
 			},
-
 			"kubernetes_ca_cert": {
-				Type:        framework.TypeString,
-				Description: "PEM encoded CA cert for use by the TLS client used to talk with the API.",
+				Type: framework.TypeString,
+				Description: `Optional PEM encoded CA cert for use by the TLS client used to talk with the API. 
+If it is not set and disable_local_ca_jwt is true, the system's trusted CA certificate pool will be used.`,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name: "Kubernetes CA Certificate",
 				},
@@ -159,7 +159,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		return logical.ErrorResponse("no host provided"), nil
 	}
 
-	disableLocalJWT := data.Get("disable_local_ca_jwt").(bool)
+	disableLocalCAJwt := data.Get("disable_local_ca_jwt").(bool)
 	pemList := data.Get("pem_keys").([]string)
 	caCert := data.Get("kubernetes_ca_cert").(string)
 	issuer := data.Get("issuer").(string)
@@ -167,8 +167,30 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	tokenReviewer := data.Get("token_reviewer_jwt").(string)
 	useAnnotationsAsAliasMetadata := data.Get("use_annotations_as_alias_metadata").(bool)
 
-	if disableLocalJWT && caCert == "" {
-		return logical.ErrorResponse("kubernetes_ca_cert must be given when disable_local_ca_jwt is true"), nil
+	// hasCerts returns true if caCert contains at least one valid certificate. It
+	// does not check if any of the certificates from caCert are CAs, although that
+	// might be something that we want in the future.
+	hasCerts := func(certBundle string) bool {
+		var b *pem.Block
+		rest := []byte(certBundle)
+		for {
+			b, rest = pem.Decode(rest)
+			if b == nil {
+				break
+			}
+
+			if pem.EncodeToMemory(b) != nil {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	if caCert != "" && !hasCerts(caCert) {
+		return logical.ErrorResponse(
+			"The provided CA PEM data contains no valid certificates",
+		), nil
 	}
 
 	config := &kubeConfig{
@@ -179,7 +201,7 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 		TokenReviewerJWT:              tokenReviewer,
 		Issuer:                        issuer,
 		DisableISSValidation:          disableIssValidation,
-		DisableLocalCAJwt:             disableLocalJWT,
+		DisableLocalCAJwt:             disableLocalCAJwt,
 		UseAnnotationsAsAliasMetadata: useAnnotationsAsAliasMetadata,
 	}
 

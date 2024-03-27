@@ -128,7 +128,16 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 	return b, nil
 }
 
-var getDefaultHTTPClient = cleanhttp.DefaultPooledClient
+// getDefaultTLSConfig returns a http.Client with the supported, default
+// tls.Config from getDefaultTLSConfig() set on the
+// cleanhttp.DefaultPooledTransport() http.Transport.
+func getDefaultHTTPClient() *http.Client {
+	transport := cleanhttp.DefaultPooledTransport()
+	transport.TLSClientConfig = getDefaultTLSConfig()
+	return &http.Client{
+		Transport: transport,
+	}
+}
 
 func getDefaultTLSConfig() *tls.Config {
 	return &tls.Config{
@@ -433,21 +442,24 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 		caCertBytes = []byte(data)
 	}
 
-	certPool := x509.NewCertPool()
-	if len(caCertBytes) > 0 {
+	var certPool *x509.CertPool
+	if len(caCertBytes) == 0 {
+		// since the CA chain is not configured, we use the system's cert pool.
+		var err error
+		certPool, err = x509.SystemCertPool()
+		if err != nil {
+			return err
+		}
+	} else {
+		// since we have a CA chain configured, we create a new x509.CertPool with its
+		// contents.
+		certPool = x509.NewCertPool()
 		if ok := certPool.AppendCertsFromPEM(caCertBytes); !ok {
 			b.Logger().Warn("Configured CA PEM data contains no valid certificates, TLS verification will fail")
 		}
-	} else {
-		// provide an empty certPool
-		b.Logger().Warn("No CA certificates configured, TLS verification will fail")
-		// TODO: think about supporting host root CA certificates via a configuration toggle,
-		// in which case RootCAs should be set to nil
 	}
 
-	// only refresh the Root CAs if they have changed since the last full update.
-	if !b.tlsConfig.RootCAs.Equal(certPool) {
-		b.Logger().Trace("Root CA certificate pool has changed, updating the client's transport")
+	setTLSClientConfig := func() error {
 		transport, ok := b.httpClient.Transport.(*http.Transport)
 		if !ok {
 			// should never happen
@@ -456,6 +468,15 @@ func (b *kubeAuthBackend) updateTLSConfig(config *kubeConfig) error {
 
 		b.tlsConfig.RootCAs = certPool
 		transport.TLSClientConfig = b.tlsConfig
+		return nil
+	}
+
+	// only refresh the Root CAs if they have changed since the last full update.
+	if b.tlsConfig.RootCAs == nil {
+		return setTLSClientConfig()
+	} else if !b.tlsConfig.RootCAs.Equal(certPool) {
+		b.Logger().Trace("Root CA certificate pool has changed, updating the client's transport")
+		return setTLSClientConfig()
 	} else {
 		b.Logger().Trace("Root CA certificate pool is unchanged, no update required")
 	}

@@ -174,7 +174,7 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
-	// test invalid cert
+	// test invalid pem_keys
 	data = map[string]interface{}{
 		"pem_keys":        "bad",
 		"kubernetes_host": "host",
@@ -192,6 +192,27 @@ func TestConfig(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if resp.Error().Error() != "data does not contain any valid RSA or ECDSA public keys" {
+		t.Fatalf("got unexpected error: %v", resp.Error())
+	}
+
+	// test invalid kubernetes_ca_cert
+	data = map[string]interface{}{
+		"kubernetes_ca_cert": testInvalidCACert,
+		"kubernetes_host":    "host",
+	}
+
+	req = &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      configPath,
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if resp == nil || !resp.IsError() {
+		t.Fatal("expected error")
+	}
+	if resp.Error().Error() != "The provided CA PEM data contains no valid certificates" {
 		t.Fatalf("got unexpected error: %v", resp.Error())
 	}
 
@@ -458,7 +479,7 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				DisableLocalCAJwt:    false,
 			},
 		},
-		"CA and disable local default": {
+		"disable local default, CA set": {
 			config: map[string]interface{}{
 				"kubernetes_host":      "host",
 				"kubernetes_ca_cert":   testCACert,
@@ -469,6 +490,39 @@ func TestConfig_LocalCaJWT(t *testing.T) {
 				PEMKeys:              []string{},
 				Host:                 "host",
 				CACert:               testCACert,
+				TokenReviewerJWT:     "",
+				DisableISSValidation: true,
+				DisableLocalCAJwt:    true,
+			},
+		},
+		"disable local default, JWT set": {
+			config: map[string]interface{}{
+				"kubernetes_host":      "host",
+				"token_reviewer_jwt":   jwtGoodDataToken,
+				"disable_local_ca_jwt": true,
+			},
+			setupInClusterFiles: true,
+			expected: &kubeConfig{
+				PublicKeys:           []crypto.PublicKey{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               "",
+				TokenReviewerJWT:     jwtGoodDataToken,
+				DisableISSValidation: true,
+				DisableLocalCAJwt:    true,
+			},
+		},
+		"disable local default, no CA or JWT": {
+			config: map[string]interface{}{
+				"kubernetes_host":      "host",
+				"disable_local_ca_jwt": true,
+			},
+			setupInClusterFiles: true,
+			expected: &kubeConfig{
+				PublicKeys:           []crypto.PublicKey{},
+				PEMKeys:              []string{},
+				Host:                 "host",
+				CACert:               "",
 				TokenReviewerJWT:     "",
 				DisableISSValidation: true,
 				DisableLocalCAJwt:    true,
