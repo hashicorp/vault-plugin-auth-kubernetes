@@ -188,7 +188,9 @@ func (b *kubeAuthBackend) pathConfigWrite(ctx context.Context, req *logical.Requ
 	}
 
 	if caCert != "" && !hasCerts(caCert) {
-		return logical.ErrorResponse("The provided CA PEM data contains no valid certificates"), nil
+		return logical.ErrorResponse(
+			"The provided CA PEM data contains no valid certificates",
+		), nil
 	}
 
 	config := &kubeConfig{
