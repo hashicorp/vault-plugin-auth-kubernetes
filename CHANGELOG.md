@@ -8,6 +8,7 @@
   * `github.com/hashicorp/cap` v0.4.1 -> v0.6.0
   * `github.com/hashicorp/vault/api` v1.11.0 -> v1.12.2
   * `github.com/hashicorp/vault/sdk` v0.10.2 -> v0.11.1
+  * `golang.org/x/net` v0.22.0 -> v0.23.0
   * `k8s.io/api` v0.29.1 -> v0.29.3
   * `k8s.io/apimachinery` v0.29.1 -> v0.29.3
 
