@@ -1,4 +1,4 @@
-## Unreleased
+## 0.19.0 (May 20, 2024)
 
 ### Changes
 
