@@ -5,6 +5,7 @@ go 1.21
 toolchain go1.21.3
 
 require (
+	github.com/go-jose/go-jose/v4 v4.0.2
 	github.com/go-test/deep v1.1.0
 	github.com/hashicorp/cap v0.6.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
@@ -15,7 +16,6 @@ require (
 	github.com/hashicorp/vault/api v1.12.2
 	github.com/hashicorp/vault/sdk v0.11.1
 	github.com/mitchellh/mapstructure v1.5.0
-	gopkg.in/square/go-jose.v2 v2.6.0
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
 )
@@ -34,7 +34,6 @@ require (
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
-	github.com/go-jose/go-jose/v4 v4.0.1 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
