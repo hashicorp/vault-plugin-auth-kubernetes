@@ -21,11 +21,11 @@ import (
 	"testing"
 	"time"
 
-	josejwt "github.com/go-jose/go-jose/v4/jwt"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/sdk/helper/tokenutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/mitchellh/mapstructure"
+	josejwt "gopkg.in/square/go-jose.v2/jwt"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -1477,7 +1477,7 @@ func Test_kubeAuthBackend_getAliasName(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			tok, err := josejwt.ParseSigned(s, allowedSignatureAlgs)
+			tok, err := josejwt.ParseSigned(s)
 			if err != nil {
 				t.Fatal(err)
 			}
