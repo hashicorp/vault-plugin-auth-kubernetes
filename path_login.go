@@ -10,14 +10,14 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-jose/go-jose/v4"
+	josejwt "github.com/go-jose/go-jose/v4/jwt"
 	capjwt "github.com/hashicorp/cap/jwt"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/cidrutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/mitchellh/mapstructure"
-	"gopkg.in/square/go-jose.v2"
-	josejwt "gopkg.in/square/go-jose.v2/jwt"
 )
 
 const (
@@ -41,6 +41,12 @@ var defaultJWTIssuer = "kubernetes/serviceaccount"
 var supportedJwtAlgs = []capjwt.Alg{
 	capjwt.RS256, capjwt.RS384, capjwt.RS512,
 	capjwt.ES256, capjwt.ES384, capjwt.ES512,
+}
+
+var allowedSignatureAlgs = []jose.SignatureAlgorithm{
+	jose.RS256,
+	jose.ES256,
+	jose.HS256,
 }
 
 // pathLogin returns the path configurations for login endpoints
@@ -302,7 +308,7 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 type DontVerifySignature struct{}
 
 func (keySet DontVerifySignature) VerifySignature(_ context.Context, token string) (map[string]interface{}, error) {
-	parsed, err := josejwt.ParseSigned(token)
+	parsed, err := josejwt.ParseSigned(token, allowedSignatureAlgs)
 	if err != nil {
 		return nil, err
 	}
