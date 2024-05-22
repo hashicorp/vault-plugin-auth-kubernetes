@@ -5,7 +5,6 @@ go 1.21
 toolchain go1.21.3
 
 require (
-	github.com/go-jose/go-jose v2.6.3+incompatible
 	github.com/go-test/deep v1.1.0
 	github.com/hashicorp/cap v0.6.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
@@ -16,6 +15,7 @@ require (
 	github.com/hashicorp/vault/api v1.12.2
 	github.com/hashicorp/vault/sdk v0.11.1
 	github.com/mitchellh/mapstructure v1.5.0
+	gopkg.in/go-jose/go-jose.v2 v2.6.3
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
 )
@@ -86,7 +86,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231030173426-d783a09b4405 // indirect
 	google.golang.org/grpc v1.60.1 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
-	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

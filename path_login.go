@@ -10,14 +10,14 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-jose/go-jose"
-	josejwt "github.com/go-jose/go-jose/jwt"
 	capjwt "github.com/hashicorp/cap/jwt"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/cidrutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/mitchellh/mapstructure"
+	"gopkg.in/go-jose/go-jose.v2"
+	josejwt "gopkg.in/go-jose/go-jose.v2/jwt"
 )
 
 const (
