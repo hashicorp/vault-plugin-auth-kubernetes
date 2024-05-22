@@ -16,8 +16,8 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/cidrutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/mitchellh/mapstructure"
-	"gopkg.in/square/go-jose.v2"
-	josejwt "gopkg.in/square/go-jose.v2/jwt"
+	"gopkg.in/go-jose/go-jose.v2"
+	josejwt "gopkg.in/go-jose/go-jose.v2/jwt"
 )
 
 const (

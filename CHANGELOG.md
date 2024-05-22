@@ -1,7 +1,10 @@
 ## Unreleased
 
+## 0.19.0 (May 20, 2024)
+
 ### Changes
 
+* Updated `gopkg.in/square/go-jose.v2@2.6.0` to `gopkg.in/go-jose/go-jose.v2@2.6.3`
 * Updated dependencies
   * `github.com/docker/docker` v24.0.7+incompatible -> v24.0.9+incompatible
   * `github.com/go-jose/go-jose/v3` v3.0.1 -> v3.0.3
