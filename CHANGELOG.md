@@ -2,6 +2,8 @@
 
 ### Changes
 
+* Building with go 1.22.4
+* Testing with k8s 1.26-1.30
 * Updated dependencies
   * `github.com/hashicorp/go-hclog` v1.6.2 -> v1.6.3
   * `github.com/hashicorp/vault/api` v1.12.2 -> v1.14.0
