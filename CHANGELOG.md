@@ -9,8 +9,8 @@
   * `github.com/hashicorp/go-hclog` v1.6.2 -> v1.6.3
   * `github.com/hashicorp/vault/api` v1.12.2 -> v1.14.0
   * `github.com/hashicorp/vault/sdk` v0.11.1 -> v0.13.0
-  * `k8s.io/api` v0.29.3 -> v0.30.2
-  * `k8s.io/apimachinery` v0.29.3 -> v0.30.2
+  * `k8s.io/api` v0.29.3 -> v0.30.3
+  * `k8s.io/apimachinery` v0.29.3 -> v0.30.3
 
 ## 0.19.0 (May 20, 2024)
 

@@ -16,8 +16,8 @@ require (
 	github.com/hashicorp/vault/sdk v0.13.0
 	github.com/mitchellh/mapstructure v1.5.0
 	gopkg.in/go-jose/go-jose.v2 v2.6.3
-	k8s.io/api v0.30.2
-	k8s.io/apimachinery v0.30.2
+	k8s.io/api v0.30.3
+	k8s.io/apimachinery v0.30.3
 )
 
 require (
