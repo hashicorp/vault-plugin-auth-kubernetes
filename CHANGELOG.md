@@ -1,7 +1,7 @@
 ## Unreleased
 
 
-## 0.19.0 (Sept 4, 2024)
+## 0.20.0 (Sept 4, 2024)
 
 ### Build:
 * Build with go 1.22.6
