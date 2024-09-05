@@ -10,14 +10,14 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-jose/go-jose/v4"
+	josejwt "github.com/go-jose/go-jose/v4/jwt"
 	capjwt "github.com/hashicorp/cap/jwt"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/cidrutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/mitchellh/mapstructure"
-	"gopkg.in/go-jose/go-jose.v2"
-	josejwt "gopkg.in/go-jose/go-jose.v2/jwt"
 )
 
 const (
@@ -37,10 +37,28 @@ var reservedAliasMetadataKeys = map[string]struct{}{
 // defaultJWTIssuer is used to verify the iss header on the JWT if the config doesn't specify an issuer.
 var defaultJWTIssuer = "kubernetes/serviceaccount"
 
-// See https://datatracker.ietf.org/doc/html/rfc7518#section-3.
-var supportedJwtAlgs = []capjwt.Alg{
-	capjwt.RS256, capjwt.RS384, capjwt.RS512,
-	capjwt.ES256, capjwt.ES384, capjwt.ES512,
+var (
+	// signing algorithms supported by k8s OIDC
+	// ref: https://github.com/kubernetes/kubernetes/blob/b4935d910dcf256288694391ef675acfbdb8e7a3/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/oidc.go#L222-L233
+	allowedSigningAlgs = []jose.SignatureAlgorithm{
+		jose.RS256,
+		jose.RS384,
+		jose.RS512,
+		jose.ES256,
+		jose.ES384,
+		jose.ES512,
+		jose.PS256,
+		jose.PS384,
+		jose.PS512,
+	}
+	// allowedSigningAlgsCap is initialized with the values from allowedSigningAlgs
+	allowedSigningAlgsCap = make([]capjwt.Alg, len(allowedSigningAlgs))
+)
+
+func init() {
+	for idx := 0; idx < len(allowedSigningAlgs); idx++ {
+		allowedSigningAlgsCap[idx] = capjwt.Alg(allowedSigningAlgs[idx])
+	}
 }
 
 // pathLogin returns the path configurations for login endpoints
@@ -302,7 +320,7 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 type DontVerifySignature struct{}
 
 func (keySet DontVerifySignature) VerifySignature(_ context.Context, token string) (map[string]interface{}, error) {
-	parsed, err := josejwt.ParseSigned(token)
+	parsed, err := josejwt.ParseSigned(token, allowedSigningAlgs)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +337,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 	role *roleStorageEntry, config *kubeConfig,
 ) (*serviceAccount, error) {
 	expected := capjwt.Expected{
-		SigningAlgorithms: supportedJwtAlgs,
+		SigningAlgorithms: allowedSigningAlgsCap,
 	}
 
 	// perform ISS Claim validation if configured
