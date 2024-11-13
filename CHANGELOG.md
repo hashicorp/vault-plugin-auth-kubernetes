@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Build:
+* Test with k8s versions 1.27-1.31
+
+
 ### Dependency updates
 * `github.com/hashicorp/go-sockaddr` v1.0.6 -> v1.0.7
 * `github.com/hashicorp/vault/api` v1.14.0 -> v1.15.0
