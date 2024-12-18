@@ -265,6 +265,74 @@ func TestFailWithMismatchNamespaceLabels(t *testing.T) {
 	}
 }
 
+func TestSuccessWithoutTokenReviewerJwtAndDisabledLocalCAJwtAndNamespaceLabels(t *testing.T) {
+	client := setupKubernetesAuth(t, map[string]interface{}{
+		"kubernetes_host":      "https://kubernetes.default.svc.cluster.local",
+		"disable_local_ca_jwt": "true",
+	})
+	roleConfigOverride := map[string]interface{}{
+		"bound_service_account_names":              "*",
+		"bound_service_account_namespace_selector": matchLabelsKeyValue,
+	}
+
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+		"role": "test-role",
+		"jwt":  createToken(t, "vault", nil),
+	})
+	if err != nil {
+		t.Fatalf("Expected successful login but got: %v", err)
+	}
+}
+
+func TestSuccessWithBadTokenReviewerJwtAndDisabledLocalCAJwtAndNamespaceLabels(t *testing.T) {
+	client := setupKubernetesAuth(t, map[string]interface{}{
+		"kubernetes_host":      "https://kubernetes.default.svc.cluster.local",
+		"disable_local_ca_jwt": "true",
+		"token_reviewer_jwt":   badTokenReviewerJwt,
+	})
+	roleConfigOverride := map[string]interface{}{
+		"bound_service_account_names":              "*",
+		"bound_service_account_namespace_selector": matchLabelsKeyValue,
+	}
+
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+		"role": "test-role",
+		"jwt":  createToken(t, "vault", nil),
+	})
+	if err != nil {
+		t.Fatalf("Expected successful login but got: %v", err)
+	}
+}
+
+func TestFailWithoutTokenReviewerJwtAndDisabledLocalCAJwtAndMismatchNamespaceLabels(t *testing.T) {
+	client := setupKubernetesAuth(t, map[string]interface{}{
+		"kubernetes_host":      "https://kubernetes.default.svc.cluster.local",
+		"disable_local_ca_jwt": "true",
+	})
+	roleConfigOverride := map[string]interface{}{
+		"bound_service_account_names":              "*",
+		"bound_service_account_namespace_selector": mismatchLabelsKeyValue,
+	}
+
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+		"role": "test-role",
+		"jwt":  createToken(t, "vault", nil),
+	})
+	respErr, ok := err.(*api.ResponseError)
+	if !ok {
+		t.Fatalf("Expected api.ResponseError but was: %T", err)
+	}
+	if respErr.StatusCode != http.StatusForbidden {
+		t.Fatalf("Expected 403 but was %d: %s", respErr.StatusCode, respErr.Error())
+	}
+}
+
 func TestFailWithBadTokenReviewerJwt(t *testing.T) {
 	client := setupKubernetesAuth(t, map[string]interface{}{
 		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
