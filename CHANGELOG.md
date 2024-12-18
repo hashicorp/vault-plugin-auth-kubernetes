@@ -11,6 +11,10 @@
 * `k8s.io/api` v0.31.0 -> v0.31.2
 * `k8s.io/apimachinery` v0.31.0 -> v0.31.2
 
+### Improvements
+
+* Allow using `bound_service_account_namespace_selector` with `disable_local_ca_jwt`. [GH-271](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/271)
+
 ## 0.20.0 (Sept 4, 2024)
 
 ### Build:
