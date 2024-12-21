@@ -8,8 +8,8 @@
 * `github.com/hashicorp/go-sockaddr` v1.0.6 -> v1.0.7
 * `github.com/hashicorp/vault/api` v1.14.0 -> v1.15.0
 * `github.com/hashicorp/vault/sdk` v0.13.0 -> v0.14.0
-* `k8s.io/api` v0.31.0 -> v0.31.2
-* `k8s.io/apimachinery` v0.31.0 -> v0.31.2
+* `k8s.io/api` v0.31.0 -> v0.31.3
+* `k8s.io/apimachinery` v0.31.0 -> v0.31.3
 
 ## 0.20.0 (Sept 4, 2024)
 
