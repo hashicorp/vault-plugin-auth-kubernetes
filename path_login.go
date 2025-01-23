@@ -205,6 +205,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	metadata[metadataKeySAName] = sa.name()
 	metadata[metadataKeySANamespace] = sa.namespace()
 	metadata[metadataKeySASecretName] = sa.SecretName
+	metadata["role"] = roleName
 
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
