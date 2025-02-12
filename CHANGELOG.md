@@ -2,6 +2,9 @@
 
 ## 0.21.0 (Feb 12, 2025)
 
+### Build:
+* Build with go 1.23.6
+
 ### Changes
 * `github.com/hashicorp/cap` v0.7.0 -> v0.8.0
 * `github.com/hashicorp/vault/api` v1.15.0 -> v1.16.0
