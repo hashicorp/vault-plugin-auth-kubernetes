@@ -1,5 +1,14 @@
 ## Unreleased
 
+## 0.21.0 (Feb 12, 2025)
+
+### Changes
+* `github.com/hashicorp/cap` v0.7.0 -> v0.8.0
+* `github.com/hashicorp/vault/api` v1.15.0 -> v1.16.0
+* `github.com/hashicorp/vault/sdk` v0.14.0 -> v0.15.0
+* `k8s.io/api` v0.31.2 -> v0.32.1
+* `k8s.io/apimachinery` v0.31.2 -> v0.32.1
+
 ### Build:
 * Test with k8s versions 1.27-1.31
 
