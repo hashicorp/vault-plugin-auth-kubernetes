@@ -1,15 +1,18 @@
 ## Unreleased
 
+## 0.21.0 (Feb 12, 2025)
+
 ### Build:
+* Build with go 1.23.6
 * Test with k8s versions 1.27-1.31
 
-
-### Dependency updates
+### Changes
+* `github.com/hashicorp/cap` v0.7.0 -> v0.8.0
+* `github.com/hashicorp/vault/api` v1.14.0 -> v1.16.0
+* `github.com/hashicorp/vault/sdk` v0.13.0 -> v0.15.0
+* `k8s.io/api` v0.31.0 -> v0.32.1
+* `k8s.io/apimachinery` v0.31.0 -> v0.32.1
 * `github.com/hashicorp/go-sockaddr` v1.0.6 -> v1.0.7
-* `github.com/hashicorp/vault/api` v1.14.0 -> v1.15.0
-* `github.com/hashicorp/vault/sdk` v0.13.0 -> v0.14.0
-* `k8s.io/api` v0.31.0 -> v0.31.2
-* `k8s.io/apimachinery` v0.31.0 -> v0.31.2
 
 ## 0.20.0 (Sept 4, 2024)
 
