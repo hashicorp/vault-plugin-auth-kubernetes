@@ -5,7 +5,7 @@ go 1.23.3
 toolchain go1.23.6
 
 require (
-	github.com/go-jose/go-jose/v4 v4.0.4
+	github.com/go-jose/go-jose/v4 v4.0.5
 	github.com/go-test/deep v1.1.1
 	github.com/hashicorp/cap v0.8.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
