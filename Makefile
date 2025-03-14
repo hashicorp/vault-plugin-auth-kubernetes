@@ -3,7 +3,7 @@ TESTARGS  ?= '-test.v'
 KIND_CLUSTER_NAME ?= vault-plugin-auth-kubernetes
 
 # kind k8s version
-KIND_K8S_VERSION ?= v1.32.2
+KIND_K8S_VERSION ?= v1.32.3
 
 .PHONY: default
 default: dev
