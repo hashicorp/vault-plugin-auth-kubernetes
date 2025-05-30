@@ -3,7 +3,7 @@
 
 ## 0.22.1 (May 30, 2025)
 
-## Build
+### Build
 * Build with go 1.24.3
 * Test with k8s versions 1.28-1.32
 
