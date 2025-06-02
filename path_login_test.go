@@ -204,6 +204,21 @@ func patchExp(input string) string {
 	return string(out)
 }
 
+// patches the given audience into the payload
+func patchAud(input string, audience string) string {
+	m := map[string]interface{}{}
+	err := json.Unmarshal([]byte(input), &m)
+	if err != nil {
+		panic(err)
+	}
+	m["aud"] = []string{audience}
+	out, err := json.Marshal(m)
+	if err != nil {
+		panic(err)
+	}
+	return string(out)
+}
+
 // creates a signed JWT token
 func jwtSign(header string, payload string, privateKey *ecdsa.PrivateKey) string {
 	header64 := strings.ReplaceAll(base64.URLEncoding.EncodeToString([]byte(header)), "=", "")
@@ -1167,6 +1182,108 @@ func TestLoginIssValidation(t *testing.T) {
 	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+}
+
+func TestLoginAudience(t *testing.T) {
+	config := defaultTestBackendConfig()
+	b, storage := setupBackend(t, config)
+
+	// Create a role with a specific audience
+	data := map[string]interface{}{
+		"bound_service_account_names":      testName,
+		"bound_service_account_namespaces": testNamespace,
+		"policies":                         "test",
+		"period":                           "3s",
+		"ttl":                              "1s",
+		"num_uses":                         12,
+		"max_ttl":                          "5s",
+		"audience":                         "vault",
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "role/plugin-test",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Create a JWT with matching audience
+	matchingAudienceJWT := jwtSign(jwtES256Header, patchAud(jwtGoodDataPayload, "vault"), ecdsaPrivateKey)
+
+	// Create a JWT with non-matching audience
+	nonMatchingAudienceJWT := jwtSign(jwtES256Header, patchAud(jwtGoodDataPayload, "other"), ecdsaPrivateKey)
+
+	// Create a JWT with no audience
+	noAudienceJWT := jwtSign(jwtES256Header, patchAud(jwtGoodDataPayload, ""), ecdsaPrivateKey)
+
+	testCases := []struct {
+		name        string
+		jwt         string
+		expectError bool
+		errContains string
+	}{
+		{
+			name:        "matching-audience",
+			jwt:         matchingAudienceJWT,
+			expectError: false,
+		},
+		{
+			name:        "non-matching-audience",
+			jwt:         nonMatchingAudienceJWT,
+			expectError: true,
+			errContains: "invalid audience (aud) claim",
+		},
+		{
+			name:        "no-audience",
+			jwt:         noAudienceJWT,
+			expectError: true,
+			errContains: "invalid audience (aud) claim",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			data := map[string]interface{}{
+				"role": "plugin-test",
+				"jwt":  tc.jwt,
+			}
+
+			req := &logical.Request{
+				Operation: logical.UpdateOperation,
+				Path:      "login",
+				Storage:   storage,
+				Data:      data,
+				Connection: &logical.Connection{
+					RemoteAddr: "127.0.0.1",
+				},
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			if tc.expectError {
+				if err == nil && (resp == nil || !resp.IsError()) {
+					t.Fatal("expected error but got none")
+				}
+				var errMsg string
+				if err != nil {
+					errMsg = err.Error()
+				} else {
+					errMsg = resp.Error().Error()
+				}
+				if !strings.Contains(errMsg, tc.errContains) {
+					t.Fatalf("expected error containing %q, got %q", tc.errContains, errMsg)
+				}
+			} else {
+				if err != nil || (resp != nil && resp.IsError()) {
+					t.Fatalf("unexpected error: err:%v resp:%#v", err, resp)
+				}
+			}
+		})
 	}
 }
 
