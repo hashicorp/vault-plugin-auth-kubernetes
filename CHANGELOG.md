@@ -1,7 +1,10 @@
 ## Unreleased
 
 
-## 0.22.1 (May 30, 2025)
+## 0.22.1 (Jun 3, 2025)
+
+### Breaking Changes
+* All Kubernetes roles, including existing ones, must specify an audience [GH-300](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/300).
 
 ### Build
 * Build with go 1.24.3
