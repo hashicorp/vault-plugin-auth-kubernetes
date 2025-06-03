@@ -170,10 +170,7 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 		"bound_service_account_names":              role.ServiceAccountNames,
 		"bound_service_account_namespaces":         role.ServiceAccountNamespaces,
 		"bound_service_account_namespace_selector": role.ServiceAccountNamespaceSelector,
-	}
-
-	if role.Audience != "" {
-		d["audience"] = role.Audience
+		"audience": role.Audience,
 	}
 
 	role.PopulateTokenData(d)
@@ -334,11 +331,6 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		return logical.ErrorResponse("can not mix %q with values", "*"), nil
 	}
 
-	role.Audience = data.Get("audience").(string)
-	if strings.TrimSpace(role.Audience) == "" {
-		return logical.ErrorResponse("audience is required"), nil
-	}
-
 	if source, ok := data.GetOk("alias_name_source"); ok {
 		// migrate the role.AliasNameSource to be the default
 		// if both it and the field value are unset
@@ -353,6 +345,12 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 
 	if err := validateAliasNameSource(role.AliasNameSource); err != nil {
 		return logical.ErrorResponse(err.Error()), nil
+	}
+
+	// verify that the audience was set
+	role.Audience = data.Get("audience").(string)
+	if strings.TrimSpace(role.Audience) == "" {
+		return logical.ErrorResponse("%q can not be empty", "audience"), nil
 	}
 
 	// Store the entry.
