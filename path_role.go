@@ -334,9 +334,9 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		return logical.ErrorResponse("can not mix %q with values", "*"), nil
 	}
 
-	// optional audience field
-	if audience, ok := data.GetOk("audience"); ok {
-		role.Audience = audience.(string)
+	role.Audience = data.Get("audience").(string)
+	if strings.TrimSpace(role.Audience) == "" {
+		return logical.ErrorResponse("audience is required"), nil
 	}
 
 	if source, ok := data.GetOk("alias_name_source"); ok {
