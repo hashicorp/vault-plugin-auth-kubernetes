@@ -29,6 +29,10 @@
 * `k8s.io/apimachinery` v0.31.0 -> v0.32.1
 * `github.com/hashicorp/go-sockaddr` v1.0.6 -> v1.0.7
 
+### Improvements
+
+* Allow using `bound_service_account_namespace_selector` with `disable_local_ca_jwt`. [GH-271](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/271)
+
 ## 0.20.0 (Sept 4, 2024)
 
 ### Build:
