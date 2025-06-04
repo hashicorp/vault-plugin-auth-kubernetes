@@ -69,15 +69,15 @@ var (
   "typ": "JWT"
 }`
 	jwtGoodDataPayload = `{
+	"aud": [
+		"kubernetes.default.svc"
+	],
   "iss": "kubernetes/serviceaccount",
   "kubernetes.io/serviceaccount/namespace": "default",
   "kubernetes.io/serviceaccount/secret.name": "vault-auth-token-t5pcn",
   "kubernetes.io/serviceaccount/service-account.name": "vault-auth",
   "kubernetes.io/serviceaccount/service-account.uid": "d77f89bc-9055-11e7-a068-0800276d99bf",
   "sub": "system:serviceaccount:default:vault-auth",
-	"aud": [
-		"kubernetes.default.svc"
-	]
 }`
 	jwtInvalidPayload = `{
   "iss": "kubernetes/serviceaccount",
