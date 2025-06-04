@@ -81,6 +81,7 @@ func TestPath_Create(t *testing.T) {
 				"num_uses":                         12,
 				"max_ttl":                          "5s",
 				"alias_name_source":                aliasNameSourceDefault,
+				"audience":                         "kubernetes.default.svc",
 			},
 			expected: &roleStorageEntry{
 				TokenParams: tokenutil.TokenParams{
@@ -101,6 +102,7 @@ func TestPath_Create(t *testing.T) {
 				NumUses:                         12,
 				BoundCIDRs:                      nil,
 				AliasNameSource:                 aliasNameSourceDefault,
+				Audience:                        "kubernetes.default.svc",
 			},
 		},
 		"alias_name_source_serviceaccount_name": {
@@ -113,6 +115,7 @@ func TestPath_Create(t *testing.T) {
 				"num_uses":                         12,
 				"max_ttl":                          "5s",
 				"alias_name_source":                aliasNameSourceSAName,
+				"audience":                         "kubernetes.default.svc",
 			},
 			expected: &roleStorageEntry{
 				TokenParams: tokenutil.TokenParams{
@@ -133,6 +136,7 @@ func TestPath_Create(t *testing.T) {
 				NumUses:                         12,
 				BoundCIDRs:                      nil,
 				AliasNameSource:                 aliasNameSourceSAName,
+				Audience:                        "kubernetes.default.svc",
 			},
 		},
 		"namespace_selector": {
@@ -145,6 +149,7 @@ func TestPath_Create(t *testing.T) {
 				"num_uses":          12,
 				"max_ttl":           "5s",
 				"alias_name_source": aliasNameSourceDefault,
+				"audience":          "kubernetes.default.svc",
 			},
 			expected: &roleStorageEntry{
 				TokenParams: tokenutil.TokenParams{
@@ -165,6 +170,7 @@ func TestPath_Create(t *testing.T) {
 				NumUses:                         12,
 				BoundCIDRs:                      nil,
 				AliasNameSource:                 aliasNameSourceDefault,
+				Audience:                        "kubernetes.default.svc",
 			},
 		},
 		"namespace_selector_with_namespaces": {
@@ -178,6 +184,7 @@ func TestPath_Create(t *testing.T) {
 				"num_uses":          12,
 				"max_ttl":           "5s",
 				"alias_name_source": aliasNameSourceDefault,
+				"audience":          "kubernetes.default.svc",
 			},
 			expected: &roleStorageEntry{
 				TokenParams: tokenutil.TokenParams{
@@ -198,6 +205,7 @@ func TestPath_Create(t *testing.T) {
 				NumUses:                         12,
 				BoundCIDRs:                      nil,
 				AliasNameSource:                 aliasNameSourceDefault,
+				Audience:                        "kubernetes.default.svc",
 			},
 		},
 		"invalid_alias_name_source": {
@@ -210,6 +218,7 @@ func TestPath_Create(t *testing.T) {
 				"num_uses":                         12,
 				"max_ttl":                          "5s",
 				"alias_name_source":                "_invalid_",
+				"audience":                         "kubernetes.default.svc",
 			},
 			wantErr: errInvalidAliasNameSource,
 		},
@@ -222,6 +231,7 @@ func TestPath_Create(t *testing.T) {
 				"ttl":      "1s",
 				"num_uses": 12,
 				"max_ttl":  "5s",
+				"audience": "kubernetes.default.svc",
 			},
 			wantErr: errors.New(`invalid "bound_service_account_namespace_selector" configured`),
 		},
@@ -234,12 +244,14 @@ func TestPath_Create(t *testing.T) {
 				"ttl":      "1s",
 				"num_uses": 12,
 				"max_ttl":  "5s",
+				"audience": "kubernetes.default.svc",
 			},
 			wantErr: errors.New(`invalid "bound_service_account_namespace_selector" configured`),
 		},
 		"no_service_account_names": {
 			data: map[string]interface{}{
 				"policies": "test",
+				"audience": "kubernetes.default.svc",
 			},
 			wantErr: errors.New(`"bound_service_account_names" can not be empty`),
 		},
@@ -247,14 +259,29 @@ func TestPath_Create(t *testing.T) {
 			data: map[string]interface{}{
 				"bound_service_account_names": "name",
 				"policies":                    "test",
+				"audience":                    "kubernetes.default.svc",
 			},
 			wantErr: errors.New(`"bound_service_account_namespaces" can not be empty if "bound_service_account_namespace_selector" is not set`),
+		},
+		"no_audience": {
+			data: map[string]interface{}{
+				"bound_service_account_names":      "name",
+				"bound_service_account_namespaces": "namespace",
+				"policies":                         "test",
+				"period":                           "3s",
+				"ttl":                              "1s",
+				"num_uses":                         12,
+				"max_ttl":                          "5s",
+				"alias_name_source":                aliasNameSourceDefault,
+			},
+			wantErr: errors.New(`"audience" can not be empty`),
 		},
 		"mixed_splat_values_names": {
 			data: map[string]interface{}{
 				"bound_service_account_names":      "*, test",
 				"bound_service_account_namespaces": "*",
 				"policies":                         "test",
+				"audience":                         "kubernetes.default.svc",
 			},
 			wantErr: errors.New(`can not mix "*" with values`),
 		},
@@ -263,6 +290,7 @@ func TestPath_Create(t *testing.T) {
 				"bound_service_account_names":      "*, test",
 				"bound_service_account_namespaces": "*",
 				"policies":                         "test",
+				"audience":                         "kubernetes.default.svc",
 			},
 			wantErr: errors.New(`can not mix "*" with values`),
 		},
@@ -324,6 +352,7 @@ func TestPath_Read(t *testing.T) {
 		"ttl":      "1s",
 		"num_uses": 12,
 		"max_ttl":  "5s",
+		"audience": "vault",
 	}
 
 	expected := map[string]interface{}{
@@ -345,6 +374,7 @@ func TestPath_Read(t *testing.T) {
 		"token_explicit_max_ttl":                   int64(0),
 		"token_no_default_policy":                  false,
 		"alias_name_source":                        aliasNameSourceDefault,
+		"audience":                                 "vault",
 	}
 
 	req := &logical.Request{
@@ -387,6 +417,7 @@ func TestPath_Delete(t *testing.T) {
 		"ttl":                              "1s",
 		"num_uses":                         12,
 		"max_ttl":                          "5s",
+		"audience":                         "kubernetes.default.svc",
 	}
 
 	req := &logical.Request{
@@ -456,6 +487,7 @@ func TestPath_Update(t *testing.T) {
 				"alias_name_source": aliasNameSourceDefault,
 				"policies":          []string{"bar", "foo"},
 				"period":            "3s",
+				"audience":          "kubernetes.default.svc",
 			},
 			expected: &roleStorageEntry{
 				TokenParams: tokenutil.TokenParams{
@@ -475,6 +507,7 @@ func TestPath_Update(t *testing.T) {
 				NumUses:                  12,
 				BoundCIDRs:               nil,
 				AliasNameSource:          aliasNameSourceDefault,
+				Audience:                 "kubernetes.default.svc",
 			},
 			wantErr: nil,
 		},
@@ -490,6 +523,7 @@ func TestPath_Update(t *testing.T) {
 			},
 			requestData: map[string]interface{}{
 				"alias_name_source": aliasNameSourceUnset,
+				"audience":          "kubernetes.default.svc",
 			},
 			expected: &roleStorageEntry{
 				TokenParams: tokenutil.TokenParams{
@@ -509,6 +543,7 @@ func TestPath_Update(t *testing.T) {
 				NumUses:                  12,
 				BoundCIDRs:               nil,
 				AliasNameSource:          aliasNameSourceDefault,
+				Audience:                 "kubernetes.default.svc",
 			},
 			wantErr: nil,
 		},
