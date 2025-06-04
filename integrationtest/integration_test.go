@@ -391,7 +391,7 @@ func TestFailWithAuthAliasMetadataAssignmentOnReservedKeys(t *testing.T) {
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  createToken(t, "vault", nil),
+		"jwt":  createToken(t, "vault", []string{"default-audience"}),
 	})
 
 	if err == nil {
