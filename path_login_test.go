@@ -76,7 +76,7 @@ var (
   "kubernetes.io/serviceaccount/service-account.uid": "d77f89bc-9055-11e7-a068-0800276d99bf",
   "sub": "system:serviceaccount:default:vault-auth",
   "aud": [
-	"kubernetes.default.svc"
+	  "kubernetes.default.svc"
   ]
 }`
 	jwtInvalidPayload = `{
@@ -87,7 +87,7 @@ var (
   "kubernetes.io/serviceaccount/service-account.uid": "044fd4f1-974d-11e7-9a15-0800276d99bf",
   "sub": "system:serviceaccount:default:vault-auth",
   "aud": [
-	"kubernetes.default.svc"
+	  "kubernetes.default.svc"
   ]
 }`
 	jwtBadServiceAccountPayload = `{
@@ -98,7 +98,7 @@ var (
   "kubernetes.io/serviceaccount/service-account.uid": "044fd4f1-974d-11e7-9a15-0800276d99bf",
   "sub": "system:serviceaccount:default:vault-invalid",
   "aud": [
-	"kubernetes.default.svc"
+	  "kubernetes.default.svc"
   ]
 }`
 	jwtProjectedDataPayload = `{
