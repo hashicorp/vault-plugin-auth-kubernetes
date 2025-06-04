@@ -455,6 +455,7 @@ func TestAudienceValidation(t *testing.T) {
 			roleConfig := map[string]interface{}{
 				"bound_service_account_names":      "vault",
 				"bound_service_account_namespaces": "test",
+				"audience":                         "default-audience",
 			}
 			if tc.audienceConfig != "" {
 				roleConfig["audience"] = tc.audienceConfig
