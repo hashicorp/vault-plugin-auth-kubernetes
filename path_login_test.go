@@ -1195,6 +1195,7 @@ func TestLoginProjectedToken(t *testing.T) {
 		"ttl":                              "1s",
 		"num_uses":                         12,
 		"max_ttl":                          "5s",
+		"audience":                         "kubernetes.default.svc",
 	}
 
 	req := &logical.Request{
