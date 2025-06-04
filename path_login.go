@@ -350,10 +350,13 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 		}
 	}
 
-	// validate the audience if the role expects it
-	if role.Audience != "" {
-		expected.Audiences = []string{role.Audience}
+	// we have to check if a kubernetes role does not have a defined audience
+	if role.Audience == "" {
+		return nil, logical.CodedError(http.StatusBadRequest,
+			"role does not have an audience defined, please update the role to include an audience")
 	}
+
+	expected.Audiences = []string{role.Audience}
 
 	// Parse into JWT
 	var err error
