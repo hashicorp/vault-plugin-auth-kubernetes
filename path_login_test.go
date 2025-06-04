@@ -74,7 +74,10 @@ var (
   "kubernetes.io/serviceaccount/secret.name": "vault-auth-token-t5pcn",
   "kubernetes.io/serviceaccount/service-account.name": "vault-auth",
   "kubernetes.io/serviceaccount/service-account.uid": "d77f89bc-9055-11e7-a068-0800276d99bf",
-  "sub": "system:serviceaccount:default:vault-auth"
+  "sub": "system:serviceaccount:default:vault-auth",
+	"aud": [
+		"kubernetes.default.svc"
+	]
 }`
 	jwtInvalidPayload = `{
   "iss": "kubernetes/serviceaccount",
@@ -82,7 +85,10 @@ var (
   "kubernetes.io/serviceaccount/secret.name": "vault-invalid-token-gvqpt",
   "kubernetes.io/serviceaccount/service-account.name": "vault-auth",
   "kubernetes.io/serviceaccount/service-account.uid": "044fd4f1-974d-11e7-9a15-0800276d99bf",
-  "sub": "system:serviceaccount:default:vault-auth"
+  "sub": "system:serviceaccount:default:vault-auth",
+	"aud": [
+		"kubernetes.default.svc"
+	]
 }`
 	jwtBadServiceAccountPayload = `{
   "iss": "kubernetes/serviceaccount",
@@ -90,7 +96,10 @@ var (
   "kubernetes.io/serviceaccount/secret.name": "vault-invalid-token-gvqpt",
   "kubernetes.io/serviceaccount/service-account.name": "vault-invalid",
   "kubernetes.io/serviceaccount/service-account.uid": "044fd4f1-974d-11e7-9a15-0800276d99bf",
-  "sub": "system:serviceaccount:default:vault-invalid"
+  "sub": "system:serviceaccount:default:vault-invalid",
+	"aud": [
+		"kubernetes.default.svc"
+	]
 }`
 	jwtProjectedDataPayload = `{
   "aud": [
@@ -204,21 +213,6 @@ func patchExp(input string) string {
 	return string(out)
 }
 
-// patches the given audience into the payload
-func patchAud(input string, audience string) string {
-	m := map[string]interface{}{}
-	err := json.Unmarshal([]byte(input), &m)
-	if err != nil {
-		panic(err)
-	}
-	m["aud"] = []string{audience}
-	out, err := json.Marshal(m)
-	if err != nil {
-		panic(err)
-	}
-	return string(out)
-}
-
 // creates a signed JWT token
 func jwtSign(header string, payload string, privateKey *ecdsa.PrivateKey) string {
 	header64 := strings.ReplaceAll(base64.URLEncoding.EncodeToString([]byte(header)), "=", "")
@@ -291,6 +285,7 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 		"num_uses":          12,
 		"max_ttl":           "5s",
 		"alias_name_source": config.aliasNameSource,
+		"audience":          "kubernetes.default.svc",
 	}
 
 	req = &logical.Request{
@@ -1041,8 +1036,9 @@ func TestLoginIssValidation(t *testing.T) {
 
 	// test successful login with default issuer
 	data = map[string]interface{}{
-		"role": "plugin-test",
-		"jwt":  jwtGoodDataToken,
+		"role":     "plugin-test",
+		"audience": "kubernetes.default.svc",
+		"jwt":      jwtGoodDataToken,
 	}
 
 	req = &logical.Request{
@@ -1078,8 +1074,9 @@ func TestLoginIssValidation(t *testing.T) {
 
 	// test successful login with explicitly defined issuer
 	data = map[string]interface{}{
-		"role": "plugin-test",
-		"jwt":  jwtGoodDataToken,
+		"role":     "plugin-test",
+		"audience": "kubernetes.default.svc",
+		"jwt":      jwtGoodDataToken,
 	}
 
 	req = &logical.Request{
@@ -1182,108 +1179,6 @@ func TestLoginIssValidation(t *testing.T) {
 	resp, err = b.HandleRequest(context.Background(), req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
-	}
-}
-
-func TestLoginAudience(t *testing.T) {
-	config := defaultTestBackendConfig()
-	b, storage := setupBackend(t, config)
-
-	// Create a role with a specific audience
-	data := map[string]interface{}{
-		"bound_service_account_names":      testName,
-		"bound_service_account_namespaces": testNamespace,
-		"policies":                         "test",
-		"period":                           "3s",
-		"ttl":                              "1s",
-		"num_uses":                         12,
-		"max_ttl":                          "5s",
-		"audience":                         "vault",
-	}
-
-	req := &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      "role/plugin-test",
-		Storage:   storage,
-		Data:      data,
-	}
-
-	resp, err := b.HandleRequest(context.Background(), req)
-	if err != nil || (resp != nil && resp.IsError()) {
-		t.Fatalf("err:%s resp:%#v\n", err, resp)
-	}
-
-	// Create a JWT with matching audience
-	matchingAudienceJWT := jwtSign(jwtES256Header, patchAud(jwtGoodDataPayload, "vault"), ecdsaPrivateKey)
-
-	// Create a JWT with non-matching audience
-	nonMatchingAudienceJWT := jwtSign(jwtES256Header, patchAud(jwtGoodDataPayload, "other"), ecdsaPrivateKey)
-
-	// Create a JWT with no audience
-	noAudienceJWT := jwtSign(jwtES256Header, patchAud(jwtGoodDataPayload, ""), ecdsaPrivateKey)
-
-	testCases := []struct {
-		name        string
-		jwt         string
-		expectError bool
-		errContains string
-	}{
-		{
-			name:        "matching-audience",
-			jwt:         matchingAudienceJWT,
-			expectError: false,
-		},
-		{
-			name:        "non-matching-audience",
-			jwt:         nonMatchingAudienceJWT,
-			expectError: true,
-			errContains: "invalid audience (aud) claim",
-		},
-		{
-			name:        "no-audience",
-			jwt:         noAudienceJWT,
-			expectError: true,
-			errContains: "invalid audience (aud) claim",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			data := map[string]interface{}{
-				"role": "plugin-test",
-				"jwt":  tc.jwt,
-			}
-
-			req := &logical.Request{
-				Operation: logical.UpdateOperation,
-				Path:      "login",
-				Storage:   storage,
-				Data:      data,
-				Connection: &logical.Connection{
-					RemoteAddr: "127.0.0.1",
-				},
-			}
-
-			resp, err := b.HandleRequest(context.Background(), req)
-			if tc.expectError {
-				if err == nil && (resp == nil || !resp.IsError()) {
-					t.Fatal("expected error but got none")
-				}
-				var errMsg string
-				if err != nil {
-					errMsg = err.Error()
-				} else {
-					errMsg = resp.Error().Error()
-				}
-				if !strings.Contains(errMsg, tc.errContains) {
-					t.Fatalf("expected error containing %q, got %q", tc.errContains, errMsg)
-				}
-			} else {
-				if err != nil || (resp != nil && resp.IsError()) {
-					t.Fatalf("unexpected error: err:%v resp:%#v", err, resp)
-				}
-			}
-		})
 	}
 }
 
@@ -1810,4 +1705,119 @@ func TestResolveRole_RoleDoesNotExist(t *testing.T) {
 	if !strings.Contains(errString, "invalid role name") {
 		t.Fatalf("Error was not due to invalid role name. Error: %s", errString)
 	}
+}
+
+func TestLoginAudienceValidation(t *testing.T) {
+	testCases := map[string]struct {
+		roleAudience string
+		jwtAudience  []string
+		expectError  bool
+		errorMsg     string
+	}{
+		"empty-audience": {
+			roleAudience: "",
+			jwtAudience:  []string{"kubernetes.default.svc"},
+			expectError:  true,
+			errorMsg:     "audience is required",
+		},
+		"matching-audience": {
+			roleAudience: "kubernetes.default.svc",
+			jwtAudience:  []string{"kubernetes.default.svc"},
+			expectError:  false,
+		},
+		"non-matching-audience": {
+			roleAudience: "vault",
+			jwtAudience:  []string{"kubernetes.default.svc"},
+			expectError:  true,
+			errorMsg:     "invalid audience (aud) claim",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			config := defaultTestBackendConfig()
+			b, storage := setupBackend(t, config)
+
+			// Update role with test audience
+			data := map[string]interface{}{
+				"bound_service_account_names":      config.saName,
+				"bound_service_account_namespaces": config.saNamespace,
+				"policies":                         "test",
+				"period":                           "3s",
+				"ttl":                              "1s",
+				"num_uses":                         12,
+				"max_ttl":                          "5s",
+				"audience":                         tc.roleAudience,
+			}
+
+			req := &logical.Request{
+				Operation: logical.CreateOperation,
+				Path:      "role/plugin-test",
+				Storage:   storage,
+				Data:      data,
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
+
+			// Create a JWT with the test audience
+			signReq := &jwtSignTestRequest{
+				issuer:    "kubernetes/serviceaccount",
+				ns:        testNamespace,
+				sa:        testName,
+				uid:       testUID,
+				projected: false,
+			}
+			claims := defaultJWTTestClaims(signReq)
+			claims["aud"] = tc.jwtAudience
+			jwtToken := jwtSign(jwtES256Header, string(mustMarshalJSON(t, claims)), ecdsaPrivateKey)
+
+			// Attempt login
+			loginData := map[string]interface{}{
+				"role": "plugin-test",
+				"jwt":  jwtToken,
+			}
+
+			req = &logical.Request{
+				Operation: logical.UpdateOperation,
+				Path:      "login",
+				Storage:   storage,
+				Data:      loginData,
+				Connection: &logical.Connection{
+					RemoteAddr: "127.0.0.1",
+				},
+			}
+
+			resp, err = b.HandleRequest(context.Background(), req)
+			if tc.expectError {
+				if err == nil && (resp == nil || !resp.IsError()) {
+					t.Fatal("expected error but got none")
+				}
+				var actualErr error
+				if err != nil {
+					actualErr = err
+				} else {
+					actualErr = resp.Error()
+				}
+				if !strings.Contains(actualErr.Error(), tc.errorMsg) {
+					t.Fatalf("expected error containing %q, got %q", tc.errorMsg, actualErr.Error())
+				}
+			} else {
+				if err != nil || (resp != nil && resp.IsError()) {
+					t.Fatalf("unexpected error: err:%s resp:%#v\n", err, resp)
+				}
+			}
+		})
+	}
+}
+
+func mustMarshalJSON(t *testing.T, v interface{}) []byte {
+	t.Helper()
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
