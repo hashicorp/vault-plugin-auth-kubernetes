@@ -435,7 +435,7 @@ func TestUnauthorizedServiceAccountErrorCode(t *testing.T) {
 const badTokenReviewerJwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6IkZza1ViNWREek8tQ05uaVk3TU5mRWZ2dEx5bzFuU0tsV3JhUU5nekhVQ28ifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiXSwiZXhwIjoxNjgwODg5NjQ4LCJpYXQiOjE2NDkzNTM2NDgsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJ0ZXN0IiwicG9kIjp7Im5hbWUiOiJ2YXVsdC0wIiwidWlkIjoiYTQwNGZiMTktNWQ4MC00OTBlLTkwYjktMGJjNWE3NzA5ODdkIn0sInNlcnZpY2VhY2NvdW50Ijp7Im5hbWUiOiJ2YXVsdCIsInVpZCI6ImI2ZTM2ZDMxLTA2MDQtNDE5MS04Y2JjLTAwYzg4ZWViZDlmOSJ9LCJ3YXJuYWZ0ZXIiOjE2NDkzNTcyNTV9LCJuYmYiOjE2NDkzNTM2NDgsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDp0ZXN0OnZhdWx0In0.hxzMpKx38rKvaWUBNEg49TioRXt_JT1Z5st4A9NeBWO2xiC8hCDgVJRWqPzejz-sYoQGhZyZcrTa0cbNRIevcR7XH4DnHd27OOzSoj198I2DAdLfw_pntzOjq35-tZhxSYXsfKH69DSpHACpu5HHUAf1aiY3B6cq5Z3gXbtaoHBocfNwvtOirGL8pTYXo1kNCkcahDPfpf3faztyUQ77v0viBKIAqwxDuGks4crqIG5jT_tOnXbb7PahwtE5cS3bMLjQb1j5oEcgq6HF4NMV46Ly479QRoXtYWWsI9OSwl4H7G9Rel3fr9q4IMdCCI5A-FLxL2Fpep9TDwrNQ3mhBQ"
 
 func TestAudienceValidation(t *testing.T) {
-	jwtWithDefaultAud := createToken(t, "vault", []string{"default-audience"})
+	jwtWithDefaultAud := createToken(t, "vault", []string{"https://kubernetes.default.svc.cluster.local"})
 	jwtWithAudA := createToken(t, "vault", []string{"a"})
 	jwtWithAudB := createToken(t, "vault", []string{"b"})
 
@@ -448,8 +448,6 @@ func TestAudienceValidation(t *testing.T) {
 		"config: default, JWT: a":       {"https://kubernetes.default.svc.cluster.local", jwtWithAudA, false},
 		"config: a, JWT: a":             {"a", jwtWithAudA, true},
 		"config: a, JWT: b":             {"a", jwtWithAudB, false},
-		"config: unset, JWT: default":   {"default-audience", jwtWithDefaultAud, true},
-		"config: unset, JWT: a":         {"a", jwtWithAudA, true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			roleConfig := map[string]interface{}{
