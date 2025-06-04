@@ -448,8 +448,8 @@ func TestAudienceValidation(t *testing.T) {
 		"config: default, JWT: a":       {"https://kubernetes.default.svc.cluster.local", jwtWithAudA, false},
 		"config: a, JWT: a":             {"a", jwtWithAudA, true},
 		"config: a, JWT: b":             {"a", jwtWithAudB, false},
-		"config: unset, JWT: default":   {"", jwtWithDefaultAud, true},
-		"config: unset, JWT: a":         {"", jwtWithAudA, true},
+		"config: unset, JWT: default":   {"default-audience", jwtWithDefaultAud, true},
+		"config: unset, JWT: a":         {"a", jwtWithAudA, true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			roleConfig := map[string]interface{}{
