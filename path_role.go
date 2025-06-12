@@ -346,7 +346,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		if resp == nil {
 			resp = &logical.Response{}
 		}
-		resp.AddWarning("This role does not specify an audience. In a future version of Vault, specifying an audience will be required.")
+		resp.AddWarning("This role does not specify an audience. In Vault v1.21+, specifying an audience will be required.")
 	}
 
 	if source, ok := data.GetOk("alias_name_source"); ok {
