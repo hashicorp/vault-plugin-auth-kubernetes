@@ -290,8 +290,12 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	}
 
 	var resp *logical.Response
+
+	// Warn if max_ttl is greater than system or backend mount's maximum TTL
 	if role.TokenMaxTTL > b.System().MaxLeaseTTL() {
-		resp = &logical.Response{}
+		if resp == nil {
+			resp = &logical.Response{}
+		}
 		resp.AddWarning("max_ttl is greater than the system or backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
 	}
 
@@ -334,9 +338,15 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		return logical.ErrorResponse("can not mix %q with values", "*"), nil
 	}
 
-	// optional audience field
+	// audiences will be required in kubernetes roles in a future Vault version
 	if audience, ok := data.GetOk("audience"); ok {
 		role.Audience = audience.(string)
+	}
+	if strings.TrimSpace(role.Audience) == "" {
+		if resp == nil {
+			resp = &logical.Response{}
+		}
+		resp.AddWarning("This role does not specify an audience. In a future version of Vault, specifying an audience will be required.")
 	}
 
 	if source, ok := data.GetOk("alias_name_source"); ok {

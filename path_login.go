@@ -350,8 +350,10 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 		}
 	}
 
-	// validate the audience if the role expects it
-	if role.Audience != "" {
+	// kubernetes roles will need to specify an audience
+	if strings.TrimSpace(role.Audience) == "" {
+		b.Logger().Warn("This role does not currently specify an audience. In a future version of Vault, specifying an audience will be required to authenticate successfully.")
+	} else {
 		expected.Audiences = []string{role.Audience}
 	}
 
