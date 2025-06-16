@@ -352,7 +352,7 @@ func TestPath_Read(t *testing.T) {
 		"ttl":      "1s",
 		"num_uses": 12,
 		"max_ttl":  "5s",
-		"audience": "vault",
+		"audience": "kubernetes.default.svc",
 	}
 
 	expected := map[string]interface{}{
@@ -374,7 +374,7 @@ func TestPath_Read(t *testing.T) {
 		"token_explicit_max_ttl":                   int64(0),
 		"token_no_default_policy":                  false,
 		"alias_name_source":                        aliasNameSourceDefault,
-		"audience":                                 "vault",
+		"audience":                                 "kubernetes.default.svc",
 	}
 
 	req := &logical.Request{
