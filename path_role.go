@@ -289,10 +289,14 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		return logical.ErrorResponse("token ttl should not be greater than token max ttl"), nil
 	}
 
-	resp := &logical.Response{}
+	var resp *logical.Response
 
 	// Warn if max_ttl is greater than system or backend mount's maximum TTL
 	if role.TokenMaxTTL > b.System().MaxLeaseTTL() {
+		if resp == nil {
+			resp = &logical.Response{}
+		}
+
 		resp.AddWarning("max_ttl is greater than the system or backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
 	}
 
@@ -343,7 +347,11 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	// Vault 1.21+ will require an audience to be set on a role for security reasons.
 	// Log a warning if the role does not specify an audience.
 	if strings.TrimSpace(role.Audience) == "" {
-		b.Logger().Warn("Role '%s' does not specify an audience. In Vault v1.21+, specifying an audience will be required.", roleName)
+		if resp == nil {
+			resp = &logical.Response{}
+		}
+
+		b.Logger().Warn(fmt.Sprintf("Role '%s' does not specify an audience. In Vault v1.21+, specifying an audience will be required.", roleName))
 		resp.AddWarning(fmt.Sprintf("Role '%s' does not specify an audience. In Vault v1.21+, specifying an audience will be required.", roleName))
 	}
 
