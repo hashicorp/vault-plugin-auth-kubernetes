@@ -167,7 +167,7 @@ func setupKubernetesAuthRole(t *testing.T, client *api.Client, boundServiceAccou
 	roleConfig := map[string]interface{}{
 		"bound_service_account_names":      boundServiceAccountName,
 		"bound_service_account_namespaces": "test",
-		"audience":                         "default-audience",
+		"audience":                         "kubernetes.default.svc",
 	}
 	if len(roleConfigOverride) != 0 {
 		roleConfig = roleConfigOverride
@@ -202,7 +202,7 @@ func TestSuccess(t *testing.T) {
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  createToken(t, "vault", []string{"default-audience"}),
+		"jwt":  createToken(t, "vault", []string{"kubernetes.default.svc"}),
 	})
 	if err != nil {
 		t.Fatalf("Expected successful login but got: %v", err)
@@ -219,7 +219,7 @@ func TestSuccessWithTokenReviewerJwt(t *testing.T) {
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  createToken(t, "vault", []string{"default-audience"}),
+		"jwt":  createToken(t, "vault", []string{"kubernetes.default.svc"}),
 	})
 	if err != nil {
 		t.Fatalf("Expected successful login but got: %v", err)
@@ -232,12 +232,13 @@ func TestSuccessWithNamespaceLabels(t *testing.T) {
 	roleConfigOverride := map[string]interface{}{
 		"bound_service_account_names":              "vault",
 		"bound_service_account_namespace_selector": matchLabelsKeyValue,
+		"audience": "kubernetes.default.svc",
 	}
 	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  createToken(t, "vault", []string{"default-audience"}),
+		"jwt":  createToken(t, "vault", []string{"kubernetes.default.svc"}),
 	})
 	if err != nil {
 		t.Fatalf("Expected successful login but got: %v", err)
@@ -250,12 +251,13 @@ func TestFailWithMismatchNamespaceLabels(t *testing.T) {
 	roleConfigOverride := map[string]interface{}{
 		"bound_service_account_names":              "vault",
 		"bound_service_account_namespace_selector": mismatchLabelsKeyValue,
+		"audience": "kubernetes.default.svc",
 	}
 	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  createToken(t, "vault", nil),
+		"jwt":  createToken(t, "vault", []string{"kubernetes.default.svc"}),
 	})
 	respErr, ok := err.(*api.ResponseError)
 	if !ok {
@@ -332,12 +334,13 @@ path "%s/{{identity.entity.aliases.%s.metadata.key-1}}" {
 		"bound_service_account_names":      "vault",
 		"bound_service_account_namespaces": "test",
 		"policies":                         []string{"default", policyNameFoo},
+		"audience":                         "kubernetes.default.svc",
 	}
 	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
 
 	loginSecret, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  createToken(t, "vault", nil),
+		"jwt":  createToken(t, "vault", []string{"kubernetes.default.svc"}),
 	})
 	if err != nil {
 		t.Fatalf("Expected successful login but got: %v", err)
@@ -391,7 +394,7 @@ func TestFailWithAuthAliasMetadataAssignmentOnReservedKeys(t *testing.T) {
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  createToken(t, "vault", []string{"default-audience"}),
+		"jwt":  createToken(t, "vault", []string{"kubernetes.default.svc"}),
 	})
 
 	if err == nil {
@@ -421,7 +424,7 @@ func TestUnauthorizedServiceAccountErrorCode(t *testing.T) {
 
 	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
 		"role": "test-role",
-		"jwt":  createToken(t, "vault", nil),
+		"jwt":  createToken(t, "vault", []string{"kubernetes.default.svc"}),
 	})
 	respErr, ok := err.(*api.ResponseError)
 	if !ok {
@@ -453,7 +456,7 @@ func TestAudienceValidation(t *testing.T) {
 			roleConfig := map[string]interface{}{
 				"bound_service_account_names":      "vault",
 				"bound_service_account_namespaces": "test",
-				"audience":                         "default-audience",
+				"audience":                         "kubernetes.default.svc",
 			}
 			if tc.audienceConfig != "" {
 				roleConfig["audience"] = tc.audienceConfig
