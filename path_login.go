@@ -162,7 +162,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 		return nil, logical.ErrUnrecoverable
 	}
 
-	sa, err := b.parseAndValidateJWT(ctx, client, jwtStr, role, config)
+	sa, err := b.parseAndValidateJWT(ctx, client, jwtStr, role, roleName, config)
 	if err != nil {
 		if err == jose.ErrCryptoFailure || strings.Contains(err.Error(), "verifying token signature") {
 			b.Logger().Debug(`login unauthorized`, "err", err)
@@ -298,7 +298,7 @@ func (b *kubeAuthBackend) aliasLookahead(ctx context.Context, req *logical.Reque
 		return nil, logical.ErrUnrecoverable
 	}
 
-	sa, err := b.parseAndValidateJWT(ctx, client, jwtStr, role, config)
+	sa, err := b.parseAndValidateJWT(ctx, client, jwtStr, role, roleName, config)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func (keySet DontVerifySignature) VerifySignature(_ context.Context, token strin
 
 // parseAndValidateJWT is used to parse, validate and lookup the JWT token.
 func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.Client, jwtStr string,
-	role *roleStorageEntry, config *kubeConfig,
+	role *roleStorageEntry, roleName string, config *kubeConfig,
 ) (*serviceAccount, error) {
 	expected := capjwt.Expected{
 		SigningAlgorithms: allowedSigningAlgsCap,
@@ -350,8 +350,12 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 		}
 	}
 
-	// validate the audience if the role expects it
-	if role.Audience != "" {
+	// Roles will need to specify an audience in Vault v1.21+.
+	// Log a warning if the role does not specify one.
+	if strings.TrimSpace(role.Audience) == "" {
+		b.Logger().Warn("A role without an audience was used to authenticate into Vault."+
+			"Vault v1.21+ will require roles to have an audience.", "role_name", roleName)
+	} else {
 		expected.Audiences = []string{role.Audience}
 	}
 
