@@ -351,8 +351,8 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 			resp = &logical.Response{}
 		}
 
-		b.Logger().Warn(fmt.Sprintf("Role '%s' does not specify an audience. In Vault v1.21+, specifying an audience will be required.", roleName))
-		resp.AddWarning(fmt.Sprintf("Role '%s' does not specify an audience. In Vault v1.21+, specifying an audience will be required.", roleName))
+		b.Logger().Warn("This role does not have an audience. In Vault v1.21+, specifying an audience on roles will be required.", "role_name", roleName)
+		resp.AddWarning(fmt.Sprintf("Role %s does not have an audience. In Vault v1.21+, specifying an audience on roles will be required.", roleName))
 	}
 
 	if source, ok := data.GetOk("alias_name_source"); ok {
