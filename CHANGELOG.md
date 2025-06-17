@@ -1,6 +1,12 @@
 ## Unreleased
 
 
+## 0.22.2 (June 17, 2025)
+
+### Changes
+
+Added warning that roles will require an audience starting in v0.23.0 [GH-301](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/301).
+
 ## 0.22.1 (May 30, 2025)
 
 ### Build
@@ -15,6 +21,12 @@
 * `k8s.io/api` v0.32.1 -> v0.33.1
 * `k8s.io/apimachinery` v0.32.1 -> v0.33.1
 
+## 0.21.1
+
+### Changes
+
+Added warning that roles will require an audience starting in v0.23.0 [GH-301](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/301).
+
 ## 0.21.0 (Feb 12, 2025)
 
 ### Build:
@@ -28,6 +40,12 @@
 * `k8s.io/api` v0.31.0 -> v0.32.1
 * `k8s.io/apimachinery` v0.31.0 -> v0.32.1
 * `github.com/hashicorp/go-sockaddr` v1.0.6 -> v1.0.7
+
+## 0.20.1
+
+### Changes
+
+Added warning that roles will require an audience starting in v0.23.0 [GH-301](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/301).
 
 ## 0.20.0 (Sept 4, 2024)
 
