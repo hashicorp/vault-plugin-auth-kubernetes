@@ -7,6 +7,11 @@
 
 Added warning that roles will require an audience starting in v0.23.0 [GH-301](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/301).
 
+### Dependency updates
+
+  * `github.com/hashicorp/vault/api` v1.16.0 -> v1.20.0
+  * `github.com/hashicorp/vault/sdk` v0.17.0 -> v0.18.0
+
 ## 0.22.1 (May 30, 2025)
 
 ### Build
