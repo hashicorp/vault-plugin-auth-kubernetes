@@ -170,10 +170,7 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 		"bound_service_account_names":              role.ServiceAccountNames,
 		"bound_service_account_namespaces":         role.ServiceAccountNamespaces,
 		"bound_service_account_namespace_selector": role.ServiceAccountNamespaceSelector,
-	}
-
-	if role.Audience != "" {
-		d["audience"] = role.Audience
+		"audience": role.Audience,
 	}
 
 	role.PopulateTokenData(d)
@@ -339,22 +336,6 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		return logical.ErrorResponse("can not mix %q with values", "*"), nil
 	}
 
-	// audiences will be required in kubernetes roles in a future Vault version
-	if audience, ok := data.GetOk("audience"); ok {
-		role.Audience = audience.(string)
-	}
-
-	// Vault 1.21+ will require an audience to be set on a role for security reasons.
-	// Log a warning if the role does not specify an audience.
-	if strings.TrimSpace(role.Audience) == "" {
-		if resp == nil {
-			resp = &logical.Response{}
-		}
-
-		b.Logger().Warn("This role does not have an audience. In Vault v1.21+, specifying an audience on roles will be required.", "role_name", roleName)
-		resp.AddWarning(fmt.Sprintf("Role %s does not have an audience. In Vault v1.21+, specifying an audience on roles will be required.", roleName))
-	}
-
 	if source, ok := data.GetOk("alias_name_source"); ok {
 		// migrate the role.AliasNameSource to be the default
 		// if both it and the field value are unset
@@ -369,6 +350,12 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 
 	if err := validateAliasNameSource(role.AliasNameSource); err != nil {
 		return logical.ErrorResponse(err.Error()), nil
+	}
+
+	// verify that the audience was set
+	role.Audience = data.Get("audience").(string)
+	if strings.TrimSpace(role.Audience) == "" {
+		return logical.ErrorResponse("%q can not be empty", "audience"), nil
 	}
 
 	// Store the entry.
