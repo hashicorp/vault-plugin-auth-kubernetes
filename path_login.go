@@ -354,7 +354,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 	if strings.TrimSpace(role.Audience) == "" {
 		return nil, logical.CodedError(http.StatusBadRequest,
 			fmt.Sprintf("Role %s does not have an audience defined. Please update the role to include an audience", roleName))
-	}
+  }
 
 	expected.Audiences = []string{role.Audience}
 

@@ -287,8 +287,13 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 	}
 
 	var resp *logical.Response
+
+	// Warn if max_ttl is greater than system or backend mount's maximum TTL
 	if role.TokenMaxTTL > b.System().MaxLeaseTTL() {
-		resp = &logical.Response{}
+		if resp == nil {
+			resp = &logical.Response{}
+		}
+
 		resp.AddWarning("max_ttl is greater than the system or backend mount's maximum TTL value; issued tokens' max TTL value will be truncated")
 	}
 
