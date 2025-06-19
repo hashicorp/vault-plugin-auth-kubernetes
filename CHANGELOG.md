@@ -1,6 +1,21 @@
 ## Unreleased
 
 
+## 0.22.2 (June 17, 2025)
+
+### Build
+* Build with go 1.24.4
+* Test with k8s versions 1.28-1.32
+
+### Changes
+
+Added warning that roles will require an audience starting in v0.23.0 [GH-301](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/301).
+
+### Dependency updates
+
+  * `github.com/hashicorp/vault/api` v1.16.0 -> v1.20.0
+  * `github.com/hashicorp/vault/sdk` v0.17.0 -> v0.18.0
+
 ## 0.22.1 (May 30, 2025)
 
 ### Build
@@ -15,6 +30,20 @@
 * `k8s.io/api` v0.32.1 -> v0.33.1
 * `k8s.io/apimachinery` v0.32.1 -> v0.33.1
 
+## 0.21.1 (June 17, 2025)
+
+### Build
+* Build with go 1.24.4
+* Test with k8s versions 1.28-1.32
+
+### Changes
+
+Added warning that roles will require an audience starting in v0.23.0 [GH-301](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/301).
+
+### Dependency updates
+
+* `github.com/go-jose/go-jose/v4` v4.0.4 -> v4.1.0
+
 ## 0.21.0 (Feb 12, 2025)
 
 ### Build:
@@ -28,6 +57,20 @@
 * `k8s.io/api` v0.31.0 -> v0.32.1
 * `k8s.io/apimachinery` v0.31.0 -> v0.32.1
 * `github.com/hashicorp/go-sockaddr` v1.0.6 -> v1.0.7
+
+## 0.20.1 (June 17, 2025)
+
+### Build
+* Build with go 1.24.4
+* Test with k8s versions 1.28-1.32
+
+### Changes
+
+Added warning that roles will require an audience starting in v0.23.0 [GH-301](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/301).
+
+### Dependency updates
+
+* `github.com/go-jose/go-jose/v4` v4.0.4 -> v4.1.0
 
 ## 0.20.0 (Sept 4, 2024)
 
