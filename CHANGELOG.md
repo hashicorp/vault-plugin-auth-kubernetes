@@ -3,6 +3,10 @@
 
 ## 0.22.2 (June 17, 2025)
 
+### Build
+* Build with go 1.24.4
+* Test with k8s versions 1.28-1.32
+
 ### Changes
 
 Added warning that roles will require an audience starting in v0.23.0 [GH-301](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/301).
