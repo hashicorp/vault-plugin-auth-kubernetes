@@ -1,0 +1,12 @@
+name: Backport Assistant
+on:
+  pull_request_target:
+    types:
+      - closed
+permissions: write-all
+jobs:
+  backport:
+    # using `main` as the ref will keep your workflow up-to-date
+    uses: hashicorp/vault-workflows-common/.github/workflows/backport.yaml@main
+    secrets:
+      VAULT_ECO_GITHUB_TOKEN: ${{ secrets.VAULT_ECO_GITHUB_TOKEN }}
