@@ -69,6 +69,9 @@ var (
   "typ": "JWT"
 }`
 	jwtGoodDataPayload = `{
+  "aud": [
+    "kubernetes.default.svc"
+  ],
   "iss": "kubernetes/serviceaccount",
   "kubernetes.io/serviceaccount/namespace": "default",
   "kubernetes.io/serviceaccount/secret.name": "vault-auth-token-t5pcn",
@@ -77,6 +80,9 @@ var (
   "sub": "system:serviceaccount:default:vault-auth"
 }`
 	jwtInvalidPayload = `{
+  "aud": [
+    "kubernetes.default.svc"
+  ],
   "iss": "kubernetes/serviceaccount",
   "kubernetes.io/serviceaccount/namespace": "default",
   "kubernetes.io/serviceaccount/secret.name": "vault-invalid-token-gvqpt",
@@ -85,6 +91,9 @@ var (
   "sub": "system:serviceaccount:default:vault-auth"
 }`
 	jwtBadServiceAccountPayload = `{
+  "aud": [
+    "kubernetes.default.svc"
+  ],
   "iss": "kubernetes/serviceaccount",
   "kubernetes.io/serviceaccount/namespace": "default",
   "kubernetes.io/serviceaccount/secret.name": "vault-invalid-token-gvqpt",
@@ -276,6 +285,7 @@ func setupBackend(t *testing.T, config *testBackendConfig) (logical.Backend, log
 		"num_uses":          12,
 		"max_ttl":           "5s",
 		"alias_name_source": config.aliasNameSource,
+		"audience":          "kubernetes.default.svc",
 	}
 
 	req = &logical.Request{
@@ -1026,8 +1036,9 @@ func TestLoginIssValidation(t *testing.T) {
 
 	// test successful login with default issuer
 	data = map[string]interface{}{
-		"role": "plugin-test",
-		"jwt":  jwtGoodDataToken,
+		"role":     "plugin-test",
+		"audience": "kubernetes.default.svc",
+		"jwt":      jwtGoodDataToken,
 	}
 
 	req = &logical.Request{
@@ -1063,8 +1074,9 @@ func TestLoginIssValidation(t *testing.T) {
 
 	// test successful login with explicitly defined issuer
 	data = map[string]interface{}{
-		"role": "plugin-test",
-		"jwt":  jwtGoodDataToken,
+		"role":     "plugin-test",
+		"audience": "kubernetes.default.svc",
+		"jwt":      jwtGoodDataToken,
 	}
 
 	req = &logical.Request{
@@ -1183,6 +1195,7 @@ func TestLoginProjectedToken(t *testing.T) {
 		"ttl":                              "1s",
 		"num_uses":                         12,
 		"max_ttl":                          "5s",
+		"audience":                         "kubernetes.default.svc",
 	}
 
 	req := &logical.Request{
@@ -1692,5 +1705,98 @@ func TestResolveRole_RoleDoesNotExist(t *testing.T) {
 
 	if !strings.Contains(errString, "invalid role name") {
 		t.Fatalf("Error was not due to invalid role name. Error: %s", errString)
+	}
+}
+
+func TestLogin_JWTAudienceValidation(t *testing.T) {
+	config := defaultTestBackendConfig()
+	b, storage := setupBackend(t, config)
+
+	// 1. Successful login with matching audience
+	data := map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  jwtGoodDataToken, // jwtGoodDataToken has audience "kubernetes.default.svc"
+	}
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+		Connection: &logical.Connection{
+			RemoteAddr: "127.0.0.1",
+		},
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("expected successful login, got err:%v resp:%#v", err, resp)
+	}
+
+	// 2. Failed login with non-matching audience
+	// Create a JWT with a different audience
+	claims := map[string]interface{}{
+		"iss":                                    "kubernetes/serviceaccount",
+		"kubernetes.io/serviceaccount/namespace": "default",
+		"kubernetes.io/serviceaccount/secret.name":          "vault-auth-token-t5pcn",
+		"kubernetes.io/serviceaccount/service-account.name": "vault-auth",
+		"kubernetes.io/serviceaccount/service-account.uid":  testUID,
+		"sub": "system:serviceaccount:default:vault-auth",
+		"aud": []string{"not-the-right-audience"},
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(time.Hour).Unix(),
+	}
+	badAudJWT, err := signTestJWT(claims)
+	if err != nil {
+		t.Fatalf("failed to sign JWT with bad audience: %v", err)
+	}
+
+	data = map[string]interface{}{
+		"role": "plugin-test",
+		"jwt":  badAudJWT,
+	}
+
+	req = &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "login",
+		Storage:   storage,
+		Data:      data,
+		Connection: &logical.Connection{
+			RemoteAddr: "127.0.0.1",
+		},
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err == nil && resp != nil && !resp.IsError() {
+		t.Fatal("expected error due to audience mismatch, but got success")
+	}
+	if err == nil && resp != nil && resp.IsError() {
+		if !strings.Contains(resp.Error().Error(), "audience") {
+			t.Fatalf("expected audience error, got: %v", resp.Error())
+		}
+	}
+
+	// 3. expected error when audience is not provided
+	// Create a role with empty audience
+	data = map[string]interface{}{
+		"bound_service_account_names":      testName,
+		"bound_service_account_namespaces": testNamespace,
+		"policies":                         "test",
+		"period":                           "3s",
+		"ttl":                              "1s",
+		"num_uses":                         12,
+		"max_ttl":                          "5s",
+		"alias_name_source":                aliasNameSourceDefault,
+		// No audience field
+	}
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "role/noaud-role",
+		Storage:   storage,
+		Data:      data,
+	}
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil || (resp != nil && resp.IsError()) && !strings.Contains(resp.Error().Error(), "audience") {
+		t.Fatalf("expected successful role creation, got err:%v resp:%#v", err, resp)
 	}
 }

@@ -350,14 +350,13 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 		}
 	}
 
-	// Roles will need to specify an audience in Vault v1.21+.
-	// Log a warning if the role does not specify one.
+	// Roles must have an audience defined, so we can verify the JWT
 	if strings.TrimSpace(role.Audience) == "" {
-		b.Logger().Warn("A role without an audience was used to authenticate into Vault. "+
-			"Vault v1.21+ will require roles to have an audience.", "role_name", roleName)
-	} else {
-		expected.Audiences = []string{role.Audience}
+		return nil, logical.CodedError(http.StatusBadRequest,
+			fmt.Sprintf("Role %s does not have an audience defined. Please update the role to include an audience", roleName))
 	}
+
+	expected.Audiences = []string{role.Audience}
 
 	// Parse into JWT
 	var err error
