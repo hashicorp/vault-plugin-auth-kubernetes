@@ -1,5 +1,7 @@
 ## Unreleased
 
+### Breaking Changes
+* All Kubernetes roles, including existing ones, must specify an audience to authenticate into Vault. [GH-300](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/300).
 
 ## 0.22.2 (June 17, 2025)
 
