@@ -130,3 +130,42 @@ make setup-integration-test
 # Run the integration tests against Vault inside the cluster
 make integration-test
 ```
+
+## Updating the Changelog
+
+All pull requests that introduce a user-facing change must include a changelog
+entry. We use the [changie](https://changie.dev/) tool to manage these entries
+and automate the release process.
+
+---
+### 1. Installing Changie
+
+You only need to do this once. If you don't have `changie` installed, choose one of the options below.
+
+* **Homebrew** (macOS):
+    ```shell
+    brew install changie
+    ```
+* **Go Install**:
+    ```shell
+    go install github.com/miniscruff/changie@latest
+    ```
+* **Other Methods**:
+  See the [official changie installation guide](https://changie.dev/guide/installation/) for other options, including pre-compiled binaries.
+
+---
+### 2. Creating an Entry
+
+Once your code changes are complete, create the changelog entry:
+
+1.  **Run the command** in your terminal:
+    ```shell
+    changie new
+    ```
+2.  **Follow the prompts.** An interactive prompt will ask you to select the
+    kind of change (e.g., `BREAKING CHANGES`, `NOTES`, `FEATURES`) and write a concise description of
+    what you changed.
+
+3.  **Commit the new file.** After you're done, `changie` will create a new
+    YAML file in the `.changie/unreleased` directory. Commit this file along with your other
+    code changes before submitting your pull request.

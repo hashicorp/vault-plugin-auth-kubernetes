@@ -18,6 +18,7 @@ How was this change implemented?
 [Example](https://github.com/hashicorp/vault/commit/2715f5cec982aabc7b7a6ae878c547f6f475bba6)
 [ ] Add output for any tests not ran in CI to the PR description (eg, acceptance tests)
 [ ] Backwards compatible
+[ ] Changelog entry added. See [Updating the Changelog](https://github.com/hashicorp/vault-plugin-auth-kubernetes/blob/main/README.md#updating-the-changelog).
 
 ## PCI review checklist
 
