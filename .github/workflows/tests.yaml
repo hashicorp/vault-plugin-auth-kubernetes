@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kind-k8s-version: [1.28.15, 1.29.14, 1.30.10, 1.31.6, 1.32.3]
+        kind-k8s-version: [1.29.14, 1.30.13, 1.31.12, 1.32.8, 1.33.4]
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Create K8s Kind Cluster
