@@ -1,32 +1,3 @@
-## Unreleased
-
-## 0.23.0 (Oct 2, 2025)
-
-### Build
-* Build with go 1.25.1
-* Test with k8s versions 1.28-1.32
-
-### Changes
-
-* Removing warning that audiences will be required. Instead, users will continue to see a warning when an audience is not configured.
-* Users can configure whether they want to require audiences in the k8s role config.
- 
-### Dependency updates
-
-  * `github.com/go-jose/go-jose/v4` v4.1.1 -> v4.1.2
-  * `github.com/hashicorp/cap` v0.9.0 -> v0.10.0
-  * `github.com/hashicorp/vault/api` v1.20.0 -> v1.21.0
-  * `github.com/hashicorp/vault/sdk` v0.18.0 -> v0.19.0
-  * `k8s.io/api` v0.33.3 -> v0.34.1
-  * `k8s.io/apimachinery` v0.33.3 -> v0.34.1
-
-## 0.22.3 (June 17, 2025)
-
-### Changes
-
-* Removing warning that audiences will be required in v0.23.0. Instead, users will continue to see a warning when an audience is not configured.
-* Users can configure whether they want to require audiences in the k8s role config.
-
 ## 0.22.2 (June 17, 2025)
 
 ### Build
