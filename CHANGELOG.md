@@ -1,3 +1,17 @@
+## v0.23.0
+### October 3, 2025
+
+* change audience warning text since audiences wont be required in Vault 1.21 (#330)
+* Upgrade Go Version (#329)
+* Automated dependency upgrades (#324)
+* ci: Update k8s versions to 1.33-1.29 (#326)
+* init changie (#323)
+* Bump actions/checkout in the github-actions-breaking group (#322)
+* Automated dependency upgrades (#317)
+* Add backport assistant workflow (#320)
+* VAULT-36974: Add backport assistant workflow (#319)
+* [Compliance] - PR Template Changes Required (#318)
+
 ## 0.22.2 (June 17, 2025)
 
 ### Build
