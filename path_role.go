@@ -339,20 +339,18 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		return logical.ErrorResponse("can not mix %q with values", "*"), nil
 	}
 
-	// audiences will be required in kubernetes roles in a future Vault version
 	if audience, ok := data.GetOk("audience"); ok {
 		role.Audience = audience.(string)
 	}
 
-	// Vault 1.21+ will require an audience to be set on a role for security reasons.
-	// Log a warning if the role does not specify an audience.
+	// Warn if audience is not set
 	if strings.TrimSpace(role.Audience) == "" {
 		if resp == nil {
 			resp = &logical.Response{}
 		}
 
-		b.Logger().Warn("This role does not have an audience. In Vault v1.21+, specifying an audience on roles will be required.", "role_name", roleName)
-		resp.AddWarning(fmt.Sprintf("Role %s does not have an audience. In Vault v1.21+, specifying an audience on roles will be required.", roleName))
+		b.Logger().Warn("This role does not have an audience configured. While audiences are not required, consider specifying one if your use case would benefit from additional JWT claim verification.", "role_name", roleName)
+		resp.AddWarning(fmt.Sprintf("Role %s does not have an audience configured. While audiences are not required, consider specifying one if your use case would benefit from additional JWT claim verification.", roleName))
 	}
 
 	if source, ok := data.GetOk("alias_name_source"); ok {
