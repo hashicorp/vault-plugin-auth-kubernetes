@@ -1,5 +1,0 @@
-kind: ENHANCEMENTS
-body: '`github.com/docker/docker` v27.2.1+incompatible -> v28.3.3+incompatible'
-time: 2025-09-02T17:34:12.872731-07:00
-custom:
-    Issue: "326"
