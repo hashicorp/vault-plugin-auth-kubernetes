@@ -349,7 +349,7 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 			resp = &logical.Response{}
 		}
 
-		b.Logger().Warn("This role does not have an audience configured. While audiences are not required, consider specifying one if your use case would benefit from additional JWT claim verification.", "role_name", roleName)
+		b.Logger().Debug("This role does not have an audience configured. While audiences are not required, consider specifying one if your use case would benefit from additional JWT claim verification.", "role_name", roleName)
 		resp.AddWarning(fmt.Sprintf("Role %s does not have an audience configured. While audiences are not required, consider specifying one if your use case would benefit from additional JWT claim verification.", roleName))
 	}
 
