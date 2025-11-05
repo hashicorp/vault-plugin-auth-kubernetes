@@ -1,3 +1,13 @@
+## v0.23.1
+### November 5, 2025
+
+* upgrade go version to 1.25.3 (#340)
+* Automated dependency upgrades (#337)
+* Update path_role.go (#336)
+* Bump actions/setup-go in the github-actions-breaking group (#328)
+* chore: remove changie (#335)
+* Update changelog for v0.23.0 release (#332)
+
 ## v0.23.0
 ### October 3, 2025
 
