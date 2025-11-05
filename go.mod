@@ -1,8 +1,6 @@
 module github.com/hashicorp/vault-plugin-auth-kubernetes
 
-go 1.24.0
-
-toolchain go1.24.3
+go 1.24.9
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.0
