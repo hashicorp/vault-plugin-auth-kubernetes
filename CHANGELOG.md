@@ -1,14 +1,3 @@
-## v0.22.4
-### November 5, 2025
-
-* backport of commit 348b9bf599d39c85c74e7f7ded78511ad653c5ab (#341)
-* backport of commit 6a5e5566019464c0e67d69de996687844b02c8a4 (#338)
-* upgrade go version (#334)
-* Automated dependency upgrades (#333)
-* backport of commit 22beabdde9e785f4e02f4463000180b94d1c7c5f (#331)
-* Add space in warning message for roles requiring audiences. (#312)
-* Log Warning When Kubernetes Role Does not Have an Audience (#301)
-
 ## v0.23.1
 ### November 5, 2025
 
@@ -32,6 +21,17 @@
 * Add backport assistant workflow (#320)
 * VAULT-36974: Add backport assistant workflow (#319)
 * [Compliance] - PR Template Changes Required (#318)
+
+## v0.22.4
+### November 5, 2025
+
+* backport of commit 348b9bf599d39c85c74e7f7ded78511ad653c5ab (#341)
+* backport of commit 6a5e5566019464c0e67d69de996687844b02c8a4 (#338)
+* upgrade go version (#334)
+* Automated dependency upgrades (#333)
+* backport of commit 22beabdde9e785f4e02f4463000180b94d1c7c5f (#331)
+* Add space in warning message for roles requiring audiences. (#312)
+* Log Warning When Kubernetes Role Does not Have an Audience (#301)
 
 ## 0.22.2 (June 17, 2025)
 
