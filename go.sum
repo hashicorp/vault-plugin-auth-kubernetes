@@ -200,8 +200,6 @@ github.com/hashicorp/go-secure-stdlib/permitpool v1.0.0 h1:U6y5MXGiDVOOtkWJ6o/tu
 github.com/hashicorp/go-secure-stdlib/permitpool v1.0.0/go.mod h1:ecDb3o+8D4xtP0nTCufJaAVawHavy5M2eZ64Nq/8/LM=
 github.com/hashicorp/go-secure-stdlib/plugincontainer v0.4.2 h1:gCNiM4T5xEc4IpT8vM50CIO+AtElr5kO9l2Rxbq+Sz8=
 github.com/hashicorp/go-secure-stdlib/plugincontainer v0.4.2/go.mod h1:6ZM4ZdwClyAsiU2uDBmRHCvq0If/03BMbF9U+U7G5pA=
-github.com/hashicorp/go-secure-stdlib/regexp v1.0.0 h1:08mz6j5MsCG9sf8tvC8Lhboe/ZMiNg41IPSh6unK5T4=
-github.com/hashicorp/go-secure-stdlib/regexp v1.0.0/go.mod h1:n/Gj3sYIEEOYds8uKS55bFf7XiYvWN4e+d+UOA7r/YU=
 github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 h1:kes8mmyCpxJsI7FTwtzRqEy9CdjCtrXrXGuOpxEA7Ts=
 github.com/hashicorp/go-secure-stdlib/strutil v0.1.2/go.mod h1:Gou2R9+il93BqX25LAKCLuM+y9U2T4hlwvT1yprcna4=
 github.com/hashicorp/go-sockaddr v1.0.7 h1:G+pTkSO01HpR5qCxg7lxfsFEZaG+C0VssTy/9dbT+Fw=
@@ -218,8 +216,8 @@ github.com/hashicorp/hcl v1.0.1-vault-7 h1:ag5OxFVy3QYTFTJODRzTKVZ6xvdfLLCA1cy/Y
 github.com/hashicorp/hcl v1.0.1-vault-7/go.mod h1:XYhtn6ijBSAj6n4YqAaf7RBPS4I06AItNorpy+MoQNM=
 github.com/hashicorp/vault/api v1.22.0 h1:+HYFquE35/B74fHoIeXlZIP2YADVboaPjaSicHEZiH0=
 github.com/hashicorp/vault/api v1.22.0/go.mod h1:IUZA2cDvr4Ok3+NtK2Oq/r+lJeXkeCrHRmqdyWfpmGM=
-github.com/hashicorp/vault/sdk v0.20.0 h1:a4ulj2gICzw/qH0A4+6o36qAHxkUdcmgpMaSSjqE3dc=
-github.com/hashicorp/vault/sdk v0.20.0/go.mod h1:xEjAt/n/2lHBAkYiRPRmvf1d5B6HlisPh2pELlRCosk=
+github.com/hashicorp/vault/sdk v0.18.0 h1:8RWVn4P4HOU5lct0GDeZS9fysJHyOJwR+Ulb5n8NPnI=
+github.com/hashicorp/vault/sdk v0.18.0/go.mod h1:8LGmRHQBzlRSuUlyhXBy5MlMaNleS5K8LO4zc4qr1HE=
 github.com/hashicorp/yamux v0.1.2 h1:XtB8kyFOyHXYVFnwT5C3+Bdo8gArse7j2AQ0DA0Uey8=
 github.com/hashicorp/yamux v0.1.2/go.mod h1:C+zze2n6e/7wshOZep2A70/aQU6QBRWJO/G6FT1wIns=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
@@ -338,8 +336,8 @@ github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3N
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
 github.com/moby/sys/atomicwriter v0.1.0 h1:kw5D/EqkBwsBFi0ss9v1VG3wIkVhzGvLklJ+w3A14Sw=
 github.com/moby/sys/atomicwriter v0.1.0/go.mod h1:Ul8oqv2ZMNHOceF643P6FKPXeCmYtlQMvpizfsSoaWs=
-github.com/moby/sys/sequential v0.6.0 h1:qrx7XFUd/5DxtqcoH1h438hF5TmOvzC/lspjy7zgvCU=
-github.com/moby/sys/sequential v0.6.0/go.mod h1:uyv8EUTrca5PnDsdMGXhZe6CCe8U/UiTWd+lL+7b/Ko=
+github.com/moby/sys/sequential v0.5.0 h1:OPvI35Lzn9K04PBbCLW0g4LcFAJgHsvXsRyewg5lXtc=
+github.com/moby/sys/sequential v0.5.0/go.mod h1:tH2cOOs5V9MlPiXcQzRC+eEyab644PWKGRYaaV5ZZlo=
 github.com/moby/term v0.5.0 h1:xt8Q1nalod/v7BqbG21f8mQPqH+xAaC9C3N3wfWbVP0=
 github.com/moby/term v0.5.0/go.mod h1:8FzsFHVUBGZdbDsJw/ot+X+d5HLUbvklYLJ9uGfcI3Y=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
