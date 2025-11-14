@@ -1,3 +1,15 @@
+## v0.22.5
+### November 7, 2025
+
+* Upgrade go version to 1.24.9 for 1.20.x (#345)
+* backport of commit 348b9bf599d39c85c74e7f7ded78511ad653c5ab (#341)
+* backport of commit 6a5e5566019464c0e67d69de996687844b02c8a4 (#338)
+* upgrade go version (#334)
+* Automated dependency upgrades (#333)
+* backport of commit 22beabdde9e785f4e02f4463000180b94d1c7c5f (#331)
+* Add space in warning message for roles requiring audiences. (#312)
+* Log Warning When Kubernetes Role Does not Have an Audience (#301)
+
 ## v0.23.1
 ### November 5, 2025
 
