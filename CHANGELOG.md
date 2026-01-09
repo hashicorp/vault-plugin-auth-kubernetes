@@ -9,6 +9,7 @@
 * backport of commit 22beabdde9e785f4e02f4463000180b94d1c7c5f (#331)
 * Add space in warning message for roles requiring audiences. (#312)
 * Log Warning When Kubernetes Role Does not Have an Audience (#301)
+* Tested with Kubernetes versions 1.35-1.31
 
 ## v0.23.1
 ### November 5, 2025
