@@ -377,11 +377,14 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 
 	// Setting debugging enable for the role
 	if tokenreview_enable, ok := data.GetOk("verbose_tokenreview_logging"); ok {
+		// Warn when the debugging output is set to true:
+		resp = &logical.Response{}
+
 		if tokenreview_enable.(bool) == true {
 			role.VerboseTokenReviewLogging = tokenreview_enable.(bool)
 		}
-		b.Logger().Debug("This role should not be used in production, hence it has debugging information print enabled", "role_name", roleName)
-		resp.AddWarning(fmt.Sprintf("The %s role should not be used in production, hence it has debugging information print enabled", roleName))
+		b.Logger().Debug("This role should not be used in production, hence it has debugging information printing enabled in Vault's operational logs", "role_name", roleName)
+		resp.AddWarning(fmt.Sprintf("The %s role should not be used in production, hence it has debugging information printing enabled in Vault's operational logs", roleName))
 	} else {
 		// Setting false explicitly
 		role.VerboseTokenReviewLogging = false
