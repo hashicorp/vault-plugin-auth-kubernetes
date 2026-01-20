@@ -1,3 +1,8 @@
+## Unreleased
+
+* Tested with Kubernetes versions 1.35-1.31
+* Test with Kind v0.31.0
+
 ## v0.22.5
 ### November 7, 2025
 
