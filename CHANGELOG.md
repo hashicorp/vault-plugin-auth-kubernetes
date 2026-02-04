@@ -110,6 +110,10 @@ Added warning that roles will require an audience starting in v0.23.0 [GH-301](h
 
 * `github.com/go-jose/go-jose/v4` v4.0.4 -> v4.1.0
 
+### Improvements
+
+* Allow using `bound_service_account_namespace_selector` with `disable_local_ca_jwt`. [GH-271](https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/271)
+
 ## 0.20.0 (Sept 4, 2024)
 
 ### Build:
