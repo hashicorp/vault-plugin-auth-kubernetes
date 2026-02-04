@@ -489,3 +489,75 @@ func TestAudienceValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestTokenReviewDebugInformation(t *testing.T) {
+	client := setupKubernetesAuth(t, map[string]interface{}{
+		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
+		"token_reviewer_jwt": createToken(t, "test-token-reviewer-account", nil),
+	})
+
+	roleConfigOverride := map[string]interface{}{
+		"bound_service_account_names": "vault",
+		"bound_service_account_namespaces": "test",
+		"verbose_tokenreview_logging" : true,
+	}
+
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+		"role": "test-role",
+		"jwt":  createToken(t, "vault", nil),
+	})
+	if err != nil {
+		t.Fatalf("Expected successful login but got: %v", err)
+	}
+}
+
+func TestTokenReviewDebugInformationWithoutToken(t *testing.T) {
+	client := setupKubernetesAuth(t, map[string]interface{}{
+		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
+	})
+
+	roleConfigOverride := map[string]interface{}{
+		"bound_service_account_names": "vault",
+		"bound_service_account_namespaces": "test",
+		"verbose_tokenreview_logging" : true,
+	}
+
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+		"role": "test-role",
+		"jwt":  createToken(t, "vault", nil),
+	})
+	if err != nil {
+		t.Fatalf("Expected successful login but got: %v", err)
+	}
+}
+
+func TestTokenReviewDebugInformationFailWithBadToken(t *testing.T) {
+	client := setupKubernetesAuth(t, map[string]interface{}{
+		"kubernetes_host":    "https://kubernetes.default.svc.cluster.local",
+		"token_reviewer_jwt": badTokenReviewerJwt,
+	})
+
+	roleConfigOverride := map[string]interface{}{
+		"bound_service_account_names": "vault",
+		"bound_service_account_namespaces": "test",
+		"verbose_tokenreview_logging" : true,
+	}
+
+	setupKubernetesAuthRole(t, client, "vault", roleConfigOverride)
+
+	_, err := client.Logical().Write("auth/kubernetes/login", map[string]interface{}{
+		"role": "test-role",
+		"jwt":  createToken(t, "vault", nil),
+	})
+	respErr, ok := err.(*api.ResponseError)
+	if !ok {
+		t.Fatalf("Expected api.ResponseError but was: %T", err)
+	}
+	if respErr.StatusCode != http.StatusForbidden {
+		t.Fatalf("Expected 403 but was %d: %s", respErr.StatusCode, respErr.Error())
+	}
+}
