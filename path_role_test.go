@@ -90,6 +90,13 @@ func TestPath_Create(t *testing.T) {
 					TokenMaxTTL:     5 * time.Second,
 					TokenNumUses:    12,
 					TokenBoundCIDRs: nil,
+					// breaking change introduced between vault@sdk/v0.22.0 and vault@sdk/v0.23.0
+					// https://github.com/hashicorp/vault/commit/3fde566dd28c65fc009114f9a3981c7787812905
+					// previously, AliasMetadata was not initialized by default if reverting to
+					// sdk/v0.22.0 or below the tests will fail, in which case AliasMetadata is
+					// expected to be nil. other test cases are more than likely affected by this
+					// breaking change.
+					AliasMetadata: make(map[string]string),
 				},
 				Policies:                        []string{"test"},
 				Period:                          3 * time.Second,
@@ -122,6 +129,7 @@ func TestPath_Create(t *testing.T) {
 					TokenMaxTTL:     5 * time.Second,
 					TokenNumUses:    12,
 					TokenBoundCIDRs: nil,
+					AliasMetadata:   make(map[string]string),
 				},
 				Policies:                        []string{"test"},
 				Period:                          3 * time.Second,
@@ -154,6 +162,13 @@ func TestPath_Create(t *testing.T) {
 					TokenMaxTTL:     5 * time.Second,
 					TokenNumUses:    12,
 					TokenBoundCIDRs: nil,
+					// breaking change introduced between vault@sdk/v0.22.0 and vault@sdk/v0.23.0
+					// https://github.com/hashicorp/vault/commit/3fde566dd28c65fc009114f9a3981c7787812905
+					// previously, AliasMetadata was not initialized by default if reverting to
+					// sdk/v0.22.0 or below the tests will fail, in which case AliasMetadata is
+					// expected to be nil. other test cases are more than likely affected by this
+					// breaking change.
+					AliasMetadata: make(map[string]string),
 				},
 				Policies:                        []string{"test"},
 				Period:                          3 * time.Second,
@@ -187,6 +202,7 @@ func TestPath_Create(t *testing.T) {
 					TokenMaxTTL:     5 * time.Second,
 					TokenNumUses:    12,
 					TokenBoundCIDRs: nil,
+					AliasMetadata:   make(map[string]string),
 				},
 				Policies:                        []string{"test"},
 				Period:                          3 * time.Second,
@@ -313,6 +329,7 @@ func TestPath_Create(t *testing.T) {
 }
 
 func TestPath_Read(t *testing.T) {
+	t.Parallel()
 	b, storage := getBackend(t)
 
 	configData := map[string]interface{}{
@@ -345,6 +362,7 @@ func TestPath_Read(t *testing.T) {
 		"token_explicit_max_ttl":                   int64(0),
 		"token_no_default_policy":                  false,
 		"alias_name_source":                        aliasNameSourceDefault,
+		"alias_metadata":                           make(map[string]string),
 	}
 
 	req := &logical.Request{
@@ -465,6 +483,13 @@ func TestPath_Update(t *testing.T) {
 					TokenMaxTTL:     5 * time.Second,
 					TokenNumUses:    12,
 					TokenBoundCIDRs: nil,
+					// breaking change introduced between vault@sdk/v0.22.0 and vault@sdk/v0.23.0
+					// https://github.com/hashicorp/vault/commit/3fde566dd28c65fc009114f9a3981c7787812905
+					// previously, AliasMetadata was not initialized by default if reverting to
+					// sdk/v0.22.0 or below the tests will fail, in which case AliasMetadata is
+					// expected to be nil. other test cases are more than likely affected by this
+					// breaking change.
+					AliasMetadata: make(map[string]string),
 				},
 				Policies:                 []string{"bar", "foo"},
 				Period:                   3 * time.Second,
@@ -499,6 +524,13 @@ func TestPath_Update(t *testing.T) {
 					TokenMaxTTL:     5 * time.Second,
 					TokenNumUses:    12,
 					TokenBoundCIDRs: nil,
+					// breaking change introduced between sdk/v0.22.0 and sdk/v0.23.0
+					// https://github.com/hashicorp/vault/commit/3fde566dd28c65fc009114f9a3981c7787812905
+					// previously, AliasMetadata was not initialized by default if reverting to
+					// sdk/v0.22.0 or below the tests will fail, in which case AliasMetadata is
+					// expected to be nil. other test cases are more than likely affected by this
+					// breaking change.
+					AliasMetadata: make(map[string]string),
 				},
 				Policies:                 []string{"test"},
 				Period:                   1 * time.Second,
@@ -547,6 +579,7 @@ func TestPath_Update(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			b, storage := getBackend(t)
 			path := fmt.Sprintf("role/%s", name)
 
