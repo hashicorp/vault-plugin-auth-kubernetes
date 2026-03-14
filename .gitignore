@@ -4,3 +4,4 @@ bin/*
 vault-plugin-auth-kubernetes
 go.work
 scratch/
+dist/*
