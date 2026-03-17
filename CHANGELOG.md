@@ -2,6 +2,13 @@
 
 * Tested with Kubernetes versions 1.35-1.31
 * Test with Kind v0.31.0
+* Build with go 1.26.1 (#357)
+* Updated dependencies (#357):
+  * `github.com/hashicorp/cap` v0.11.0 -> v0.12.0
+  * `github.com/hashicorp/vault/sdk` v0.20.0 -> v0.23.0
+  * `k8s.io/api` v0.34.1 -> v0.35.2
+  * `k8s.io/apimachinery` v0.34.1 -> v0.35.2
+* Updated tests for breaking change in vault/sdk v0.23.0 (#357)
 
 ## v0.22.5
 ### November 7, 2025
