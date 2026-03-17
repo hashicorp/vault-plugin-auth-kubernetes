@@ -100,6 +100,11 @@ default: %q
 					Description: tokenutil.DeprecationText("token_bound_cidrs"),
 					Deprecated:  true,
 				},
+				"verbose_tokenreview_logging": {
+					Type:        framework.TypeBool,
+					Description: `Logs the client's JWT token as well as the JWT token used to access the TokenReview endpoint of the configured Kubernetes cluster, alongside more debug information. Information is visible in debug-level operational logs. Do NOT set to true on production systems!`,
+					Default:     false,
+				},
 			},
 			ExistenceCheck: b.pathRoleExistenceCheck,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
@@ -198,6 +203,7 @@ func (b *kubeAuthBackend) pathRoleRead(ctx context.Context, req *logical.Request
 	}
 
 	d["alias_name_source"] = role.AliasNameSource
+	d["verbose_tokenreview_logging"] = role.VerboseTokenReviewLogging
 
 	return &logical.Response{
 		Data: d,
@@ -369,6 +375,21 @@ func (b *kubeAuthBackend) pathRoleCreateUpdate(ctx context.Context, req *logical
 		return logical.ErrorResponse(err.Error()), nil
 	}
 
+	// Setting debugging preferences for TokenReview API calls if verbose_tokenreview_logging parameter is set to true
+	if tokenreview_enable_debug, ok := data.GetOk("verbose_tokenreview_logging"); ok {
+		// Warn when the debugging output is set to true:
+		resp = &logical.Response{}
+
+		if tokenreview_enable_debug.(bool) {
+			role.VerboseTokenReviewLogging = true
+			b.Logger().Debug("This role should not be used in production, hence it has debugging information printing enabled in Vault's operational logs", "role_name", roleName)
+			resp.AddWarning(fmt.Sprintf("The %s role should not be used in production, hence it has debugging information printing enabled in Vault's operational logs", roleName))
+		} else {
+			// Setting false explicitly
+			role.VerboseTokenReviewLogging = false
+		}
+	}
+
 	// Store the entry.
 	entry, err := logical.StorageEntryJSON("role/"+strings.ToLower(roleName), role)
 	if err != nil {
@@ -405,6 +426,9 @@ type roleStorageEntry struct {
 
 	// AliasNameSource used when deriving the Alias' name.
 	AliasNameSource string `json:"alias_name_source" mapstructure:"alias_name_source" structs:"alias_name_source"`
+
+	// Flag to enable debugging of TokenReview endpoint calls
+	VerboseTokenReviewLogging bool `json:"verbose_tokenreview_logging" mapstructure:"verbose_tokenreview_logging" structs:"verbose_tokenreview_logging"`
 
 	// Deprecated by TokenParams
 	Policies   []string      `json:"policies" structs:"policies" mapstructure:"policies"`
