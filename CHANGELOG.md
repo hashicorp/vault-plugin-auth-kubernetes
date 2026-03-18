@@ -1,3 +1,16 @@
+## v0.24.0
+### March 18, 2026
+
+* Update dependencies and Go version (#357)
+* Bump the github-actions-backward-compatible group across 1 directory with 2 updates (#356)
+* Bump golang.org/x/crypto from 0.36.0 to 0.45.0 in /integrationtest (#348)
+* Bump golang.org/x/crypto from 0.40.0 to 0.45.0 (#349)
+* [COMPLIANCE] Update Copyright and License Headers (Batch 1 of 1) (#353)
+* CI: test against k8s 1.35 (#354)
+* Update changelog for v0.22.5 release (#346)
+* Bump helm/kind-action in the github-actions-backward-compatible group (#347)
+* Update changelog for v0.23.1 release (#343)
+
 ## Unreleased
 
 * Tested with Kubernetes versions 1.35-1.31
