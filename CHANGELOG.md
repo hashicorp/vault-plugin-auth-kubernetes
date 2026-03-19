@@ -1,4 +1,16 @@
-## Unreleased
+## v0.24.1
+### March 19, 2026
+
+* Build with go 1.26.1
+* Updated dependencies (#358):
+  * `github.com/hashicorp/vault/sdk` v0.23.0 -> v0.24.0
+  * `google.golang.org/grpc` v1.70.0 -> v1.79.3
+  * `k8s.io/api` v0.35.2 -> v0.35.3
+  * `k8s.io/apimachinery` v0.35.2 -> v0.35.3
+
+
+## v0.24.0
+### March 19, 2026
 
 * Tested with Kubernetes versions 1.35-1.31
 * Test with Kind v0.31.0
