@@ -87,7 +87,8 @@ func (t *tokenReviewAPI) Review(ctx context.Context, client *http.Client, jwt st
 		// this can happen if the service account is deleted, and even if it has
 		// since been recreated the token will have changed, which means our
 		// caller will need to be updated accordingly.
-		return nil, errors.New("lookup failed: service account unauthorized; this could mean it has been deleted or recreated with a new token")
+		// Also printing the actual error returned from Kubernetes
+		return nil, fmt.Errorf("lookup failed: service account unauthorized; this could mean it has been deleted or recreated with a new token: %s", err)
 	case err != nil:
 		return nil, err
 	}
