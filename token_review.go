@@ -21,6 +21,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+var (
+	// errTokenReviewUnauthorized is returned when kubernetes_host rejects the
+	// reviewer bearer token with HTTP 401. This is not the same as TokenReview
+	// returning authenticated=false for the login JWT: a deleted or invalid
+	// service account token is a 200 with status.authenticated=false.
+	errTokenReviewUnauthorized = errors.New("token review API unauthorized")
+
+	// errTokenReviewForbidden is returned when the reviewer lacks permission
+	// to create TokenReview objects (HTTP 403).
+	errTokenReviewForbidden = errors.New("token review API forbidden")
+)
+
 // This is the result from the token review
 type tokenReviewResult struct {
 	Name      string
@@ -83,11 +95,12 @@ func (t *tokenReviewAPI) Review(ctx context.Context, client *http.Client, jwt st
 	r, err := parseResponse(resp)
 	switch {
 	case kubeerrors.IsUnauthorized(err):
-		// If the err is unauthorized that means the token has since been deleted;
-		// this can happen if the service account is deleted, and even if it has
-		// since been recreated the token will have changed, which means our
-		// caller will need to be updated accordingly.
-		return nil, errors.New("lookup failed: service account unauthorized; this could mean it has been deleted or recreated with a new token")
+		// HTTP 401 means kubernetes_host rejected the *reviewer* bearer, not
+		// that the login JWT's service account was deleted. Deleted or invalid
+		// tokens come back as HTTP 200 with status.authenticated=false.
+		return nil, fmt.Errorf("%w: kubernetes_host rejected the reviewer credential with HTTP 401; if token_reviewer_jwt is unset the login JWT is used as the bearer and the API server must accept Kubernetes service account tokens: %v", errTokenReviewUnauthorized, err)
+	case kubeerrors.IsForbidden(err):
+		return nil, fmt.Errorf("%w: kubernetes_host rejected the reviewer credential with HTTP 403; the reviewer ServiceAccount needs the system:auth-delegator ClusterRole: %v", errTokenReviewForbidden, err)
 	case err != nil:
 		return nil, err
 	}

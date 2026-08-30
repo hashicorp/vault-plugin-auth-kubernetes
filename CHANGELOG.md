@@ -1,3 +1,9 @@
+## Unreleased
+
+### Improvements
+
+* Log TokenReview API failures (HTTP 401/403, transport, TLS) at error instead of debug. HTTP 401 from `kubernetes_host` is the reviewer credential being rejected, not a deleted service account; a deleted or invalid login JWT is HTTP 200 with `status.authenticated=false`. The client still receives permission denied. [#373](https://github.com/hashicorp/vault-plugin-auth-kubernetes/issues/373) [#168](https://github.com/hashicorp/vault-plugin-auth-kubernetes/issues/168)
+
 ## v0.24.1
 ### March 19, 2026
 
