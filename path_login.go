@@ -25,6 +25,7 @@ const (
 	metadataKeySAName       = "service_account_name"
 	metadataKeySANamespace  = "service_account_namespace"
 	metadataKeySASecretName = "service_account_secret_name"
+	metadataKeyRole         = "role"
 )
 
 var reservedAliasMetadataKeys = map[string]struct{}{
@@ -32,6 +33,7 @@ var reservedAliasMetadataKeys = map[string]struct{}{
 	metadataKeySAName:       {},
 	metadataKeySANamespace:  {},
 	metadataKeySASecretName: {},
+	metadataKeyRole:         {},
 }
 
 // defaultJWTIssuer is used to verify the iss header on the JWT if the config doesn't specify an issuer.
@@ -205,6 +207,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	metadata[metadataKeySAName] = sa.name()
 	metadata[metadataKeySANamespace] = sa.namespace()
 	metadata[metadataKeySASecretName] = sa.SecretName
+	metadata[metadataKeyRole] = roleName
 
 	auth := &logical.Auth{
 		Alias: &logical.Alias{
@@ -219,7 +222,7 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 			metadataKeySAName:       sa.name(),
 			metadataKeySANamespace:  sa.namespace(),
 			metadataKeySASecretName: sa.SecretName,
-			"role":                  roleName,
+			metadataKeyRole:         roleName,
 		},
 		DisplayName: fmt.Sprintf("%s-%s", sa.namespace(), sa.name()),
 	}
