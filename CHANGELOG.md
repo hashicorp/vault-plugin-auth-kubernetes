@@ -1,3 +1,9 @@
+## v0.25.0
+### September 22, 2026
+
+* chore: automated Go/dependency update via vault-plugin-release (#376)
+* bump up golang.org/x/crypto to v0.54.0 (#369)
+
 ## v0.24.1
 ### March 19, 2026
 
