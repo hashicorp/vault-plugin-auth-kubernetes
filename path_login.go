@@ -114,6 +114,19 @@ func (b *kubeAuthBackend) pathResolveRole(ctx context.Context, req *logical.Requ
 	return logical.ResolveRoleResponse(roleName)
 }
 
+// printTokenReviewDebugInformation is used to print debugging information related to TokenReview endpoint calls upon login attempt
+func (b *kubeAuthBackend) printTokenReviewDebugInformation(roleName string, jwtStr string, config *kubeConfig) {
+	b.Logger().Debug(fmt.Sprintf("Printing debugging information for role %s", roleName))
+
+	// This might be explicitly set or read from the disk, more info in backend.go
+	if config.TokenReviewerJWT != "" {
+		b.Logger().Debug(`Token reviewer JWT is set either explicitly via token_reviewer_jwt parameter or read from Vault server's Pod`, "token", config.TokenReviewerJWT)
+	} else {
+		// If the config.TokenReviewerJWT is empty that means we did not read it from the disk nor it was explicitly specified by the config, so client's JWT is used.
+		b.Logger().Debug(`Using client's JWT to access TokenReview endpoint`, "token", jwtStr)
+	}
+}
+
 // pathLogin is used to authenticate to this backend
 func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName, resp := b.getFieldValueStr(data, "role")
@@ -174,6 +187,11 @@ func (b *kubeAuthBackend) pathLogin(ctx context.Context, req *logical.Request, d
 	aliasName, err := b.getAliasName(role, sa)
 	if err != nil {
 		return nil, err
+	}
+
+	// We print debugging information if the verbose_tokenreview_logging parameter is set to true
+	if role.VerboseTokenReviewLogging {
+		b.printTokenReviewDebugInformation(roleName, jwtStr, config)
 	}
 
 	// look up the JWT token in the kubernetes API
