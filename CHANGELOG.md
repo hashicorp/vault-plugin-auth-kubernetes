@@ -1,3 +1,9 @@
+## v0.25.1
+### October 22, 2026
+
+* Upgrade dependencies to resolve security vulnerabilities (#380)
+* Update changelog for v0.25.0 release (#379)
+
 ## v0.25.0
 ### September 22, 2026
 
