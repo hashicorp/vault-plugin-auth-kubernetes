@@ -5,6 +5,11 @@
 * bump up golang.org/x/crypto to v0.54.0 (#369)
 
 ## v0.24.1
+### March 20, 2026
+
+* Update dependencies and changelog for v0.24.1 (#360)
+
+## v0.24.1
 ### March 19, 2026
 
 * Build with go 1.26.1
