@@ -1,3 +1,13 @@
+## v0.25.2
+
+## What's Changed
+* VAULT-51926: Bump hashicorp/cap to v0.15.0 to drop go-jose v3 by @tvo0813 in https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/382
+
+## New Contributors
+* @tvo0813 made their first contribution in https://github.com/hashicorp/vault-plugin-auth-kubernetes/pull/382
+
+**Full Changelog**: https://github.com/hashicorp/vault-plugin-auth-kubernetes/compare/v0.25.1...v0.25.2
+
 ## v0.25.0
 ### September 22, 2026
 
