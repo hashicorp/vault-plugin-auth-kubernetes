@@ -404,7 +404,7 @@ func (b *kubeAuthBackend) parseAndValidateJWT(ctx context.Context, client *http.
 	// verify the namespace selector matches the namespace
 	if !allowed && role.ServiceAccountNamespaceSelector != "" {
 		allowed, err = b.namespaceValidatorFactory(config).validateLabels(ctx,
-			client, sa.namespace(), role.ServiceAccountNamespaceSelector)
+			client, sa.namespace(), role.ServiceAccountNamespaceSelector, jwtStr)
 	}
 
 	if !allowed {

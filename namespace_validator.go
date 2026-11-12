@@ -22,7 +22,7 @@ import (
 
 // namespaceValidator defines a namespace validator interface
 type namespaceValidator interface {
-	validateLabels(context.Context, *http.Client, string, string) (bool, error)
+	validateLabels(context.Context, *http.Client, string, string, string) (bool, error)
 }
 
 type namespaceValidatorFactory func(*kubeConfig) namespaceValidator
@@ -38,7 +38,7 @@ func newNsValidatorWrapper(config *kubeConfig) namespaceValidator {
 	}
 }
 
-func (v *namespaceValidatorWrapper) validateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string) (bool, error) {
+func (v *namespaceValidatorWrapper) validateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string, jwtStr string) (bool, error) {
 	labelSelector, err := makeNsLabelSelector(namespaceSelector)
 	if err != nil {
 		return false, err
@@ -49,7 +49,7 @@ func (v *namespaceValidatorWrapper) validateLabels(ctx context.Context, client *
 		return false, err
 	}
 
-	nsLabels, err := v.getNamespaceLabels(ctx, client, namespace)
+	nsLabels, err := v.getNamespaceLabels(ctx, client, namespace, jwtStr)
 	if err != nil {
 		return false, err
 	}
@@ -57,18 +57,22 @@ func (v *namespaceValidatorWrapper) validateLabels(ctx context.Context, client *
 	return selector.Matches(labels.Set(nsLabels)), nil
 }
 
-func (v *namespaceValidatorWrapper) getNamespaceLabels(ctx context.Context, client *http.Client, namespace string) (map[string]string, error) {
+func (v *namespaceValidatorWrapper) getNamespaceLabels(ctx context.Context, client *http.Client, namespace string, jwtStr string) (map[string]string, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/%s", strings.TrimSuffix(v.config.Host, "/"), namespace)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// Use the configured TokenReviewer JWT as the bearer
-	if v.config.TokenReviewerJWT == "" {
+	// Use client JWT as bearer if local CA disabled
+	// Otherwise use TokenReviewer JWT
+	bearer := v.config.TokenReviewerJWT
+	if v.config.DisableLocalCAJwt {
+		bearer = jwtStr
+	} else if v.config.TokenReviewerJWT == "" {
 		return nil, errors.New("namespace lookup failed: TokenReviewer JWT needs to be configured to use namespace selectors")
 	}
-	setRequestHeader(req, fmt.Sprintf("Bearer %s", v.config.TokenReviewerJWT))
+	setRequestHeader(req, fmt.Sprintf("Bearer %s", bearer))
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -137,7 +141,7 @@ func mockNamespaceValidateFactory(labels map[string]string) namespaceValidatorFa
 	}
 }
 
-func (v *mockNamespaceValidator) validateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string) (bool, error) {
+func (v *mockNamespaceValidator) validateLabels(ctx context.Context, client *http.Client, namespace string, namespaceSelector string, jwtStr string) (bool, error) {
 	labelSelector, err := makeNsLabelSelector(namespaceSelector)
 	if err != nil {
 		return false, err
