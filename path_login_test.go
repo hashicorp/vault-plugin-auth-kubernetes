@@ -885,6 +885,18 @@ func TestLoginEntityAliasMetadataAssignment(t *testing.T) {
 			t.Fatalf("expected value %q got %q for key %q", expV, v, expK)
 		}
 	}
+
+	expK := "role"
+	expV := data["role"]
+	v, ok := resp.Auth.Alias.Metadata["role"]
+
+	if !ok {
+		t.Fatalf("expected key %q not found", expK)
+	}
+
+	if v != expV {
+		t.Fatalf("expected value %q got %q for key %q", expV, v, expK)
+	}
 }
 
 func TestAliasLookAhead(t *testing.T) {
